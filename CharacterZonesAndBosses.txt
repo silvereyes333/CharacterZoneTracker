@@ -1,0 +1,9 @@
+## Title: Character Zone and Boss Achievements
+## Author: silvereyes
+## Description: Tracks zone exploration achievements and dungeon boss Conqueror and Vanquisher achievements per-character. No special UI, just the base game map, Zone Guide and achievements screens, the way they were before Update 33.
+## Version: 1.0.0
+## APIVersion: 101032 101033
+
+## This Add-On is not created by, affiliated with or sponsored by ZeniMax Media Inc. or its affiliates. The Elder Scrolls® and related logos are registered trademarks or trademarks of ZeniMax Media Inc. in the United States and/or other countries. All rights reserved.
+
+CharacterZonesAndBosses.lua
