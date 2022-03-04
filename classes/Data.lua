@@ -20,7 +20,6 @@ function Data:Initialize()
         AreAllActivitiesComplete = "AreAllZoneStoryActivitiesCompleteForZoneCompletionType",
         CanActivitiesContinue = "CanZoneStoryContinueTrackingActivitiesForCompletionType",
         GetNumCompletedActivities = "GetNumCompletedZoneActivitiesForZoneCompletionType",
-        GetNumUnblockedActivities = "GetNumUnblockedZoneStoryActivitiesForZoneCompletionType",
         IsActivityComplete = "IsZoneStoryActivityComplete",
         GetPOIMapInfo = "GetPOIMapInfo",
     }
@@ -77,14 +76,6 @@ function Data:GetNumCompletedActivities(zoneId, completionType)
         return trueCount(self, zoneId, completionType)
     end
     return self.esoui.GetNumCompletedZoneActivitiesForZoneCompletionType(zoneId, completionType)
-end
-
---[[  ]]
-function Data:GetNumUnblockedActivities(zoneId, completionType)
-    if addon.ZoneGuideTracker:IsCompletionTypeTracked(completionType) then
-        return trueCount(self, zoneId, completionType)
-    end
-    return self.esoui.GetNumUnblockedZoneStoryActivitiesForZoneCompletionType(zoneId, completionType)
 end
 
 function Data:GetPOIMapInfo(zoneIndex, poiIndex)

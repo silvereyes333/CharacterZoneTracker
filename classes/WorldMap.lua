@@ -7,7 +7,7 @@
 local addon = CharacterZonesAndBosses
 local debug = true
 local COLOR_NORMAL = ZO_ColorDef:New(GetInterfaceColor(INTERFACE_COLOR_TYPE_TEXT_COLORS, INTERFACE_TEXT_COLOR_NORMAL))
-local getPinDetails, getToggleText, shouldPinShowCompletionMenu, toggleTrackedActivity
+local getPinDetails, getCompleteText, getResetText, markPinComplete, markPinIncomplete, shouldPinShowCompletionMenu
 
 -- Singleton class
 local WorldMap = ZO_Object:Subclass()
@@ -18,6 +18,18 @@ end
 
 function WorldMap:Initialize()
   
+    -- Placeholder handler to make the total number of handlers returned by GetDynamicHandlers be greater than 1, to trigger the context menu.
+    local dummyHandler =
+    {
+        name = function() return GetString(SI_DIALOG_CANCEL) end,
+        gamepadName = GetString(SI_DIALOG_CANCEL),
+        gamepadDialogEntryName = GetString(SI_DIALOG_CANCEL),
+        gamepadDialogEntryColor = COLOR_NORMAL,
+        callback = function(pin) --[[ noop ]] end,
+        czbRemove = true
+    }
+    
+    -- Menu action to force-complete a zone activity
     ZO_MapPin.PIN_CLICK_HANDLERS[MOUSE_BUTTON_INDEX_LEFT][MAP_PIN_TYPE_POI_SEEN] = 
     {
         {
@@ -26,20 +38,36 @@ function WorldMap:Initialize()
             GetDynamicHandlers = function(pin)
                 local handlers = {
                     {
-                        name = getToggleText,
-                        gamepadName = getToggleText,
-                        gamepadDialogEntryName = getToggleText,
+                        name = getCompleteText,
+                        gamepadName = getCompleteText,
+                        gamepadDialogEntryName = getCompleteText,
                         gamepadDialogEntryColor = COLOR_NORMAL,
-                        callback = toggleTrackedActivity,
+                        callback = markPinComplete,
                     },
+                    dummyHandler,
+                }
+
+                return handlers
+            end,
+        }
+    }
+  
+    -- Menu action to force-reset a zone activity
+    ZO_MapPin.PIN_CLICK_HANDLERS[MOUSE_BUTTON_INDEX_LEFT][MAP_PIN_TYPE_POI_COMPLETE] = 
+    {
+        {
+            -- Show / hide logic for pin menu
+            show = shouldPinShowCompletionMenu,
+            GetDynamicHandlers = function(pin)
+                local handlers = {
                     {
-                        name = function() return GetString(SI_DIALOG_CANCEL) end,
-                        gamepadName = GetString(SI_DIALOG_CANCEL),
-                        gamepadDialogEntryName = GetString(SI_DIALOG_CANCEL),
+                        name = getResetText,
+                        gamepadName = getResetText,
+                        gamepadDialogEntryName = getResetText,
                         gamepadDialogEntryColor = COLOR_NORMAL,
-                        callback = function(pin) --[[ noop ]] end,
-                        czbRemove = true
+                        callback = markPinIncomplete,
                     },
+                    dummyHandler,
                 }
 
                 return handlers
@@ -47,6 +75,7 @@ function WorldMap:Initialize()
         }
     }
     
+    -- Hook pin click menu creation events to remove the dummy handler menu entry before display.
     ZO_PreHook("ZO_WorldMap_SetupGamepadChoiceDialog", function(...) self:PrehookSetupPinChoiceMenu(...) end)
     ZO_PreHook("ZO_WorldMap_SetupKeyboardChoiceMenu", function(...) self:PrehookSetupPinChoiceMenu(...) end)
 end
@@ -86,19 +115,39 @@ function getPinDetails(pin)
     end
     local objective, completionType = addon.ZoneGuideTracker:GetPOIObjective(nil, poiIndex)
     local zoneId = GetZoneId(objective.zoneIndex)
-    local complete = addon.Data:IsActivityComplete(zoneId, completionType, objective.activityIndex)
-    return objective, completionType, zoneId, complete
+    return objective, completionType, zoneId
 end
-function getToggleText(pin)
+function getCompleteText(pin)
+    local objective, completionType, zoneId = getPinDetails(pin)
+    if not objective then
+        return
+    end
+    local stringTemplate = GetString("SI_ZONECOMPLETIONTYPE_SHORTDESCRIPTION", completionType)
+    return zo_strformat(stringTemplate, objective.name)
+end
+function getResetText(pin)
     local objective, completionType, zoneId, complete = getPinDetails(pin)
     if not objective then
         return
     end
-    if complete then
-        return zo_strformat(SI_GUILD_FINDER_GUILD_INFO_ATTRIBUTE_FORMATTER, GetString(SI_OPTIONS_RESET), objective.name)
+    return zo_strformat(SI_GUILD_FINDER_GUILD_INFO_ATTRIBUTE_FORMATTER, GetString(SI_OPTIONS_RESET), objective.name)
+end
+function markPinComplete(pin)
+    local objective, completionType, zoneId = getPinDetails(pin)
+    if not objective then
+        return
     end
-    local stringTemplate = GetString("SI_ZONECOMPLETIONTYPE_SHORTDESCRIPTION", completionType)
-    return zo_strformat(stringTemplate, objective.name)
+    addon.Data:SetActivityComplete(zoneId, completionType, objective.activityIndex, true)
+    addon.ZoneGuideTracker:UpdateUIAndAnnounce(objective, true)
+end
+function markPinIncomplete(pin)
+    local objective, completionType, zoneId = getPinDetails(pin)
+    if not objective then
+        return
+    end
+    addon.Data:SetActivityComplete(zoneId, completionType, objective.activityIndex, false)
+    addon.ZoneGuideTracker:UpdateUIAndAnnounce(objective, false)
+    -- TODO: show reset message
 end
 function shouldPinShowCompletionMenu(pin)
     local poiIndex = pin:GetPOIIndex()
@@ -107,27 +156,6 @@ function shouldPinShowCompletionMenu(pin)
     end
     local objective = addon.ZoneGuideTracker:GetPOIObjective(nil, poiIndex)
     return objective ~= nil
-end
-function toggleTrackedActivity(pin)
-    local objective, completionType, zoneId, complete = getPinDetails(pin)
-    if not objective then
-        return
-    end
-    addon.Data:SetActivityComplete(zoneId, completionType, objective.activityIndex, not complete)
-    -- Refresh pins
-    ZO_WorldMap_RefreshAllPOIs()
-    -- Refresh zone guide
-    if IsInGamepadPreferredMode() then
-        WORLD_MAP_ZONE_STORY_GAMEPAD:RefreshInfo()
-        GAMEPAD_WORLD_MAP_INFO_ZONE_STORY:RefreshInfo()
-    else
-        WORLD_MAP_ZONE_STORY_KEYBOARD:RefreshInfo()
-    end
-    if complete then
-        -- TODO: show reset message
-    else
-        addon.ZoneGuideTracker:AnnounceCompletion(objective)
-    end
 end
 
 
