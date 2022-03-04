@@ -5,7 +5,9 @@
   ]]
   
 local addon = CharacterZonesAndBosses
-local debug = true
+local debug = false
+local DELVE_BOSS_MAX_HP = 133844
+local BOSS_KILL_REASONS = { [PROGRESS_REASON_BOSS_KILL] = true, [PROGRESS_REASON_OVERLAND_BOSS_KILL] = true }
 
 -- Singleton class
 local Events = ZO_Object:Subclass()
@@ -18,16 +20,21 @@ function Events:Initialize()
   
     if GetAPIVersion() >= 101033 then
         self.handlerNames = {
-            [EVENT_CLIENT_INTERACT_RESULT]     = "ClientInteractResult",
+            --[EVENT_CLIENT_INTERACT_RESULT]     = "ClientInteractResult",
             [EVENT_COMBAT_EVENT]               = "CombatEvent",
+            [EVENT_EXPERIENCE_UPDATE]          = "ExperienceUpdate",
             [EVENT_OBJECTIVE_COMPLETED]        = "ObjectiveCompleted",
             [EVENT_POIS_INITIALIZED]           = "POIsInitialized",
             [EVENT_PLAYER_ACTIVATED]           = "PlayerActivated",
+            [EVENT_POWER_UPDATE]               = "PowerUpdate",
+            [EVENT_TRACKED_ZONE_STORY_ACTIVITY_COMPLETED] = "TrackedZoneStoryActivityCompleted",
+            --[EVENT_UNIT_ATTRIBUTE_VISUAL_ADDED] = "UnitAttributeVisualAdded",
+            --[EVENT_UNIT_ATTRIBUTE_VISUAL_REMOVED] = "UnitAttributeVisualRemoved",
+            --[EVENT_UNIT_ATTRIBUTE_VISUAL_UPDATED] = "UnitAttributeVisualUpdated",
             [EVENT_WORLD_EVENT_UNIT_DESTROYED] = "WorldEventUnitDestroyed",
             [EVENT_WORLD_EVENT_ACTIVATED]      = "WorldEventActivated",
             [EVENT_WORLD_EVENT_ACTIVE_LOCATION_CHANGED] = "WorldEventActiveLocationChanged",
             [EVENT_WORLD_EVENT_DEACTIVATED]    = "WorldEventDeactivated",
-            [EVENT_TRACKED_ZONE_STORY_ACTIVITY_COMPLETED] = "TrackedZoneStoryActivityCompleted",
             [EVENT_ZONE_CHANGED]               = "ZoneChanged",
             [EVENT_ZONE_UPDATE]                = "ZoneUpdate",
         }
@@ -44,8 +51,13 @@ function Events:Initialize()
     
     if GetAPIVersion() >= 101033 then
         EVENT_MANAGER:AddFilterForEvent(addon.name .. "CombatEvent", EVENT_COMBAT_EVENT, REGISTER_FILTER_COMBAT_RESULT, ACTION_RESULT_TARGET_DEAD)
+        EVENT_MANAGER:AddFilterForEvent(addon.name .. "CombatEvent", EVENT_COMBAT_EVENT, REGISTER_FILTER_TARGET_COMBAT_UNIT_TYPE, COMBAT_UNIT_TYPE_NONE)
         EVENT_MANAGER:RegisterForEvent(addon.name .. "CombatEvent2", EVENT_COMBAT_EVENT, self:Closure("CombatEvent"))
         EVENT_MANAGER:AddFilterForEvent(addon.name .. "CombatEvent2", EVENT_COMBAT_EVENT, REGISTER_FILTER_COMBAT_RESULT, ACTION_RESULT_DIED_XP)
+        EVENT_MANAGER:AddFilterForEvent(addon.name .. "CombatEvent2", EVENT_COMBAT_EVENT, REGISTER_FILTER_TARGET_COMBAT_UNIT_TYPE, COMBAT_UNIT_TYPE_NONE)
+        EVENT_MANAGER:AddFilterForEvent(addon.name .. "ExperienceUpdate", EVENT_ZONE_UPDATE, REGISTER_FILTER_UNIT_TAG, "player")
+        EVENT_MANAGER:AddFilterForEvent(addon.name .. "PowerUpdate", EVENT_POWER_UPDATE, REGISTER_FILTER_UNIT_TAG, "reticleover")
+        EVENT_MANAGER:AddFilterForEvent(addon.name .. "PowerUpdate", EVENT_POWER_UPDATE, REGISTER_FILTER_POWER_TYPE, POWERTYPE_HEALTH)
         EVENT_MANAGER:AddFilterForEvent(addon.name .. "ZoneUpdate", EVENT_ZONE_UPDATE, REGISTER_FILTER_UNIT_TAG, "player")
         -- We are only interested in ACTION_RESULT_DIED combat events
         --EVENT_MANAGER:AddFilterForEvent(addon.name, EVENT_COMBAT_EVENT, REGISTER_FILTER_COMBAT_RESULT, ACTION_RESULT_DIED)
@@ -53,6 +65,15 @@ function Events:Initialize()
         --EVENT_MANAGER:AddFilterForEvent(addon.name, EVENT_COMBAT_EVENT, REGISTER_FILTER_TARGET_COMBAT_UNIT_TYPE, COMBAT_UNIT_TYPE_NONE)
     end
 end
+
+
+
+---------------------------------------
+--
+--          Public Methods
+-- 
+---------------------------------------
+
 function Events:AchievementAwarded(eventCode, name, points, id, link)
     addon.Utility.Debug("EVENT_ACHIEVEMENT_AWARDED(" .. tostring(eventCode) .. ", "..tostring(name) .. ", "..tostring(points) .. ", "..tostring(id) .. ", "..tostring(link) .. ")", debug)
 end
@@ -69,18 +90,23 @@ end
 
 --[[  ]]
 function Events:CombatEvent(eventCode, result, isError, abilityName, abilityGraphic, abilityActionSlotType, sourceName, sourceType, targetName, targetType, hitValue, powerType, damageType, log, sourceUnitId, targetUnitId, abilityId, overflow)
-    if result == ACTION_RESULT_EFFECT_GAINED or result == ACTION_RESULT_EFFECT_FADED or result == ACTION_RESULT_BEGIN then
+    if addon.ZoneGuideTracker:RegisterKill(targetName) then
+        addon.Utility.Debug("EVENT_COMBAT_EVENT(" .. tostring(eventCode) .. ", result: "..tostring(result) .. ", isError: "..tostring(isError) 
+            .. ", sourceName: "..tostring(sourceName) .. ", sourceType: " .. tostring(sourceType) .. ", targetName: "..tostring(targetName) .. ", targetType: "..tostring(targetType) 
+            .. ", source: "..tostring(sourceUnitId) .. ", target: "..tostring(targetUnitId)
+            .. ", sourceDifficulty: "..tostring(sourceUnitDifficulty) .. ", targetDifficulty: "..tostring(targetUnitDifficulty).. ")", debug)
+    end
+end
+
+--[[  ]]
+function Events:ExperienceUpdate(eventCode, unitTag, currentExp, maxExp, reason)
+    if not BOSS_KILL_REASONS[reason] then
         return
     end
-    if targetType ~= 0 then
-        return
+    local unitName = GetUnitName(unitTag)
+    if addon.ZoneGuideTracker:RegisterKill(nil, reason) then
+        addon.Utility.Debug("EVENT_EXPERIENCE_UPDATE(" .. tostring(eventCode) .. ", unitTag: "..tostring(unitTag) .. ", unitName: "..tostring(unitName) .. ", currentExp: "..tostring(currentExp) .. ", maxExp: " .. tostring(maxExp) .. ", reason: " .. tostring(reason) .. ")", debug)
     end
-    local sourceUnitDifficulty = GetUnitDifficulty(sourceUnitId)
-    local targetUnitDifficulty = GetUnitDifficulty(targetUnitId)
-    addon.Utility.Debug("EVENT_COMBAT_EVENT(" .. tostring(eventCode) .. ", result: "..tostring(result) .. ", isError: "..tostring(isError) 
-        .. ", sourceName: "..tostring(sourceName) .. ", sourceType: " .. tostring(sourceType) .. ", targetName: "..tostring(targetName) .. ", targetType: "..tostring(targetType) 
-        .. ", source: "..tostring(sourceUnitId) .. ", target: "..tostring(targetUnitId)
-        .. ", sourceDifficulty: "..tostring(sourceUnitDifficulty) .. ", targetDifficulty: "..tostring(targetUnitDifficulty).. ")", debug)
 end
 
 --[[  ]]
@@ -93,20 +119,40 @@ end
 function Events:PlayerActivated(eventCode, initial)
     local zoneIndex = GetCurrentMapZoneIndex()
     local zoneId = GetZoneId(zoneIndex)
-    addon.Utility.Debug("EVENT_PLAYER_ACTIVATED(" .. tostring(eventCode) .. ", "..tostring(initial) .. ", zoneId: "..tostring(zoneId) .. ", zoneIndex: "..tostring(zoneIndex) .. ", addon: " .. tostring(addon) ..", addon.ZoneGuideTracker: " .. tostring(addon.ZoneGuideTracker) .. ")", debug)
-    addon.ZoneGuideTracker:SetZoneIndex(zoneIndex)
+    addon.Utility.Debug("EVENT_PLAYER_ACTIVATED(" .. tostring(eventCode) .. ", "..tostring(initial) .. ", zoneId: "..tostring(zoneId) .. ", zoneIndex: "..tostring(zoneIndex) .. ")", debug)
+    addon.ZoneGuideTracker:InitializeZone(zoneIndex)
 end
 
 --[[  ]]
-function Events:POIsInitialized(eventCode)
-    local zoneIndex = GetCurrentMapZoneIndex()
-    local zoneId = GetZoneId(zoneIndex)
-    local numPOIs = GetNumPOIs(zoneIndex)
-    addon.Utility.Debug("EVENT_POIS_INITIALIZED(" .. tostring(eventCode) .. ", zoneId: "..tostring(zoneId) .. ", zoneIndex: "..tostring(zoneIndex) ", numPOIs: " .. tostring(numPOIs) .. ")", debug)
+function Events:PowerUpdate(eventCode, unitTag, powerIndex, powerType, powerValue, powerMax, powerEffectiveMax)
+    if powerMax < DELVE_BOSS_MAX_HP then
+        return
+    end
+    local unitName = GetUnitName(unitTag)
+    if powerMax == DELVE_BOSS_MAX_HP then
+        addon.ZoneGuideTracker:RegisterDelveBossName(unitName)
+    elseif IsUnitInDungeon("player") then
+        return
+    else
+        addon.ZoneGuideTracker:RegisterWorldBossName(unitName)
+    end
+    addon.Utility.Debug("EVENT_POWER_UPDATE(" .. tostring(eventCode) .. ", unitTag: "..tostring(unitTag) .. ", unitName: "..tostring(unitName) .. ", powerIndex: "..tostring(powerIndex) .. ", powerType: " .. tostring(powerType) .. ", powerValue: " .. tostring(powerValue) .. ", powerMax: " .. tostring(powerMax) .. ", powerEffectiveMax: " .. tostring(powerEffectiveMax) .. ")", debug)
 end
 
 function Events:TrackedZoneStoryActivityCompleted(eventCode, zoneId, zoneCompletionType, activityId)
     addon.Utility.Debug("EVENT_TRACKED_ZONE_STORY_ACTIVITY_COMPLETED(" .. tostring(eventCode) .. ", "..tostring(zoneId) .. ", "..tostring(zoneCompletionType) .. ", "..tostring(activityId) .. ")", debug)
+end
+
+function Events:UnitAttributeVisualAdded(eventCode, unitTag, unitAttributeVisual, statType, attributeType, powerType, value, maxValue, sequenceId)
+    addon.Utility.Debug("EVENT_UNIT_ATTRIBUTE_VISUAL_ADDED(" .. tostring(eventCode) .. ", unitTag: "..tostring(unitTag) .. ", unitAttributeVisual: "..tostring(unitAttributeVisual) .. ", statType: "..tostring(statType) .. ", attributeType: "..tostring(attributeType) .. ", powerType: "..tostring(powerType) .. ", value: "..tostring(value) .. ", maxValue: "..tostring(maxValue) .. ", sequenceId: "..tostring(sequenceId) .. ")", debug)
+end
+
+function Events:UnitAttributeVisualRemoved(eventCode, unitTag, unitAttributeVisual, statType, attributeType, powerType, value, maxValue, sequenceId)
+    addon.Utility.Debug("EVENT_UNIT_ATTRIBUTE_VISUAL_REMOVED("  .. tostring(eventCode) .. ", unitTag: "..tostring(unitTag) .. ", unitAttributeVisual: "..tostring(unitAttributeVisual) .. ", statType: "..tostring(statType) .. ", attributeType: "..tostring(attributeType) .. ", powerType: "..tostring(powerType) .. ", value: "..tostring(value) .. ", maxValue: "..tostring(maxValue) .. ", sequenceId: "..tostring(sequenceId) .. ")", debug)
+end
+
+function Events:UnitAttributeVisualUpdated(eventCode, unitTag, unitAttributeVisual, statType, attributeType, powerType, oldValue, newValue, oldMaxValue, newMaxValue, sequenceId)
+    addon.Utility.Debug("EVENT_UNIT_ATTRIBUTE_VISUAL_UPDATED(" .. tostring(eventCode) .. ", unitTag: "..tostring(unitTag) .. ", unitAttributeVisual: "..tostring(unitAttributeVisual) .. ", statType: "..tostring(statType) .. ", attributeType: "..tostring(attributeType) .. ", powerType: "..tostring(powerType) .. ", oldValue: "..tostring(oldValue) .. ", newValue: "..tostring(newValue) .. ", oldMaxValue: "..tostring(oldMaxValue) .. ", newMaxValue: "..tostring(newMaxValue) .. ", sequenceId: "..tostring(sequenceId) .. ")", debug)
 end
 
 --[[  ]]
@@ -125,7 +171,7 @@ end
 function Events:WorldEventDeactivated(eventCode, worldEventInstanceId)
     -- Say the character is standing near another dolmen when one across the world completes.
     addon.Utility.Debug("EVENT_WORLD_EVENT_DEACTIVATED(" .. tostring(eventCode) .. ", "..tostring(worldEventInstanceId) .. ")", debug)
-    addon.ZoneGuideTracker:SetActiveWorldEventInstanceId(worldEventInstanceId)
+    addon.ZoneGuideTracker:DeactivateWorldEventInstance()
 end
 
 --[[  ]]
@@ -143,7 +189,7 @@ function Events:ZoneChanged(eventCode, zoneName, subZoneName, newSubzone, zoneId
     end
     local zoneIndex = GetZoneIndex(zoneId)
     addon.Utility.Debug("EVENT_ZONE_CHANGED(" .. tostring(zoneName) .. ", "..tostring(subZoneName) .. ", "..tostring(newSubzone) .. ", zoneId: "..tostring(zoneId) .. ", subZoneId: "..tostring(subZoneId) .. ")", debug)
-    addon.ZoneGuideTracker:SetZoneIndex(zoneIndex)
+    addon.ZoneGuideTracker:InitializeZone(zoneIndex)
 end
 
 --[[  ]]
@@ -151,83 +197,8 @@ function Events:ZoneUpdate(eventCode, unitTag, newZoneName)
     local zoneIndex = GetCurrentMapZoneIndex()
     local zoneId = GetZoneId(zoneIndex)
     addon.Utility.Debug("EVENT_ZONE_UPDATE(" .. tostring(newZoneName) .. ", zoneId: "..tostring(zoneId) .. ", zoneIndex: "..tostring(zoneIndex) .. ")", debug)
-    addon.ZoneGuideTracker:SetZoneIndex(zoneIndex)
+    addon.ZoneGuideTracker:InitializeZone(zoneIndex)
 end
 
 -- Create singleton
 addon.Events = Events:New()
-
-
-
---[[
-
-* EVENT_ACHIEVEMENTS_COMPLETED_ON_UPGRADE_TO_ACCOUNT_WIDE (*integer* _numAchievementsCompleteOnUpgrade_)
-
-
- EVENT_UNIT_DESTROYED (number eventCode, string unitTag)
-
- GetUnitDifficulty(string unitTag)
-Returns: number UIMonsterDifficulty difficult
-
-UIMonsterDifficulty
-MONSTER_DIFFICULTY_DEADLY
-MONSTER_DIFFICULTY_EASY
-MONSTER_DIFFICULTY_HARD
-MONSTER_DIFFICULTY_NONE
-MONSTER_DIFFICULTY_NORMAL
-
-Search on ESOUI Source Code GetUnitType(string unitTag)
-Returns: number type
-Search on ESOUI Source Code GetUnitWorldPosition(string unitTag)
-Returns: number zoneId, number worldX, number worldY, number worldZ
-Search on ESOUI Source Code GetUnitZoneIndex(string unitTag)
-Returns: number:nilable zoneIndex
-Search on ESOUI Source Code GetZoneId(number zoneIndex)
-Returns: number zoneId
-Search on ESOUI Source Code GetZoneIndex(number zoneId)
-Returns: number zoneIndex
-Search on ESOUI Source Code GetZoneNameById(number zoneId)
-Returns: string name
-
-
-EVENT_WORLD_EVENT_UNIT_DESTROYED (number eventCode, number worldEventInstanceId, string unitTag)
-
-Search on ESOUI Source Code GetWorldEventId(number worldEventInstanceId)
-Returns: number worldEventId
-Search on ESOUI Source Code GetWorldEventInstanceUnitPinType(number worldEventInstanceId, string unitTag)
-Returns: number MapDisplayPinType pinType
-Search on ESOUI Source Code GetWorldEventInstanceUnitTag(number worldEventInstanceId, number unitIndex)
-Returns: string unitTag
-Search on ESOUI Source Code GetWorldEventType(number worldEventId)
-Returns: number WorldEventType worldEventType
-
-
-* GetAchievementPersistenceLevel(*integer* _achievementId_)
-** _Returns:_ *[AchievementPersistenceLevel|#AchievementPersistenceLevel]* _persistenceLevel_
-
-* GetCharIdForCompletedAchievement(*integer* _achievementId_)
-** _Returns:_ *id64* _charId_
-
-* GetSkyshardAchievementZoneId(*integer* _achievementId_)
-** _Returns:_ *integer* _zoneId_
-
- GetAssociatedAchievementIdForZoneCompletionType(number zoneId, number ZoneCompletionType zoneCompletionType, number associatedAchievementIndex)
-Returns: number associatedAchievementId 
-      GetNumAssociatedAchievementsForZoneCompletionType(number zoneId, number ZoneCompletionType zoneCompletionType)
-Returns: number numAssociatedAchievements
-    GetRecentlyCompletedAchievements(number numAchievementsToGet)
-Uses variable returns...
-Returns: number achievementId
-
-Search on ESOUI Source Code GetMarketProductUnlockedByAchievementInfo(number marketProductId)
-Returns: number achievementId, boolean hasCompletedAchievement, number:nilable helpCategoryIndex, number:nilable helpIndex
-
-Search on ESOUI Source Code IsPlayerInsidePinArea(number MapDisplayPinType pinType, number param1, number param2, number param3)
-Search on ESOUI Source Code GetMapLocationTooltipLineInfo(number locationIndex, number tooltipLineIndex)
-Returns: textureName icon, string name, number grouping, string categoryName
-
-Search on ESOUI Source Code GetNumMapLocationTooltipLines(number locationIndex)
- GetMapLocationTooltipHeader(number locationIndex)
- 
- /script d(GetMapLocationTooltipHeader(1))
-]]--

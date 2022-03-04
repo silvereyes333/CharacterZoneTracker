@@ -10,6 +10,7 @@ CharacterZonesAndBosses = {
 
 -- Local declarations
 local addon = CharacterZonesAndBosses
+local onAddonLoaded
 
 
 
@@ -29,6 +30,9 @@ local addon = CharacterZonesAndBosses
 function onAddonLoaded(event, name)
     if name ~= addon.name then return end
     EVENT_MANAGER:UnregisterForEvent(addon.name, EVENT_ADD_ON_LOADED)
+    
+    addon.Events:Initialize()
+    addon.WorldMap:Initialize()
 end
 
 
