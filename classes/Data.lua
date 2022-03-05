@@ -1,5 +1,5 @@
 local addon = CharacterZonesAndBosses
-local debug = false
+local debug = true
 local trueCount, containsAnyUntrue
 
 local Data = ZO_Object:Subclass()
@@ -122,6 +122,7 @@ function Data:SetActivityComplete(zoneId, completionType, activityIndex, complet
         self.save[zoneId][completionType] = {}
     end
     self.save[zoneId][completionType][activityIndex] = complete
+    return true
 end
 
 ---------------------------------------
@@ -133,7 +134,7 @@ end
 function containsAnyUntrue(self, zoneId, completionType)
     if self.save[zoneId] and self.save[zoneId][completionType] then
         for activityIndex = 1, GetNumZoneActivitiesForZoneCompletionType(zoneId, completionType) do
-            if not self.save[zoneId][completionType][activityIndex] then
+            if not self.save[zoneId] or not self.save[zoneId][completionType] or not self.save[zoneId][completionType][activityIndex] then
                 return true
             end
         end
@@ -143,7 +144,7 @@ end
 function trueCount(self, zoneId, completionType)
     local count = 0
     for activityIndex = 1, GetNumZoneActivitiesForZoneCompletionType(zoneId, completionType) do
-        if self.save[zoneId][completionType][activityIndex] then
+        if self.save[zoneId] and self.save[zoneId][completionType] and self.save[zoneId][completionType][activityIndex] then
             count = count + 1
         end
     end

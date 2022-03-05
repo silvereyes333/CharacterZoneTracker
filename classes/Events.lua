@@ -5,8 +5,12 @@
   ]]
   
 local addon = CharacterZonesAndBosses
-local debug = false
+local debug = true
 local DELVE_BOSS_MAX_HP = 133844
+local DELVE_BOSS_MAX_HP2 = 103494
+local DELVE_BOSS_MAX_HP3 = 146590
+local DELVE_BOSS_MAX_HP4 = 127470
+local DELVE_BOSS_MAX_HP5 = 66924
 local BOSS_KILL_REASONS = { [PROGRESS_REASON_BOSS_KILL] = true, [PROGRESS_REASON_OVERLAND_BOSS_KILL] = true }
 
 -- Singleton class
@@ -23,10 +27,12 @@ function Events:Initialize()
             --[EVENT_CLIENT_INTERACT_RESULT]     = "ClientInteractResult",
             [EVENT_COMBAT_EVENT]               = "CombatEvent",
             [EVENT_EXPERIENCE_UPDATE]          = "ExperienceUpdate",
+            --[EVENT_EXPERIENCE_GAIN]            = "ExperienceGain",
             [EVENT_OBJECTIVE_COMPLETED]        = "ObjectiveCompleted",
             [EVENT_POIS_INITIALIZED]           = "POIsInitialized",
             [EVENT_PLAYER_ACTIVATED]           = "PlayerActivated",
-            [EVENT_POWER_UPDATE]               = "PowerUpdate",
+            --[EVENT_POWER_UPDATE]               = "PowerUpdate",
+            [EVENT_RETICLE_TARGET_CHANGED]     = "ReticleTargetChanged",
             [EVENT_TRACKED_ZONE_STORY_ACTIVITY_COMPLETED] = "TrackedZoneStoryActivityCompleted",
             --[EVENT_UNIT_ATTRIBUTE_VISUAL_ADDED] = "UnitAttributeVisualAdded",
             --[EVENT_UNIT_ATTRIBUTE_VISUAL_REMOVED] = "UnitAttributeVisualRemoved",
@@ -56,13 +62,9 @@ function Events:Initialize()
         EVENT_MANAGER:AddFilterForEvent(addon.name .. "CombatEvent2", EVENT_COMBAT_EVENT, REGISTER_FILTER_COMBAT_RESULT, ACTION_RESULT_DIED_XP)
         EVENT_MANAGER:AddFilterForEvent(addon.name .. "CombatEvent2", EVENT_COMBAT_EVENT, REGISTER_FILTER_TARGET_COMBAT_UNIT_TYPE, COMBAT_UNIT_TYPE_NONE)
         EVENT_MANAGER:AddFilterForEvent(addon.name .. "ExperienceUpdate", EVENT_ZONE_UPDATE, REGISTER_FILTER_UNIT_TAG, "player")
-        EVENT_MANAGER:AddFilterForEvent(addon.name .. "PowerUpdate", EVENT_POWER_UPDATE, REGISTER_FILTER_UNIT_TAG, "reticleover")
-        EVENT_MANAGER:AddFilterForEvent(addon.name .. "PowerUpdate", EVENT_POWER_UPDATE, REGISTER_FILTER_POWER_TYPE, POWERTYPE_HEALTH)
+        --EVENT_MANAGER:AddFilterForEvent(addon.name .. "PowerUpdate", EVENT_POWER_UPDATE, REGISTER_FILTER_UNIT_TAG, "reticleover")
+        --EVENT_MANAGER:AddFilterForEvent(addon.name .. "PowerUpdate", EVENT_POWER_UPDATE, REGISTER_FILTER_POWER_TYPE, POWERTYPE_HEALTH)
         EVENT_MANAGER:AddFilterForEvent(addon.name .. "ZoneUpdate", EVENT_ZONE_UPDATE, REGISTER_FILTER_UNIT_TAG, "player")
-        -- We are only interested in ACTION_RESULT_DIED combat events
-        --EVENT_MANAGER:AddFilterForEvent(addon.name, EVENT_COMBAT_EVENT, REGISTER_FILTER_COMBAT_RESULT, ACTION_RESULT_DIED)
-        --EVENT_MANAGER:AddFilterForEvent(addon.name .. "CombatEvent", EVENT_COMBAT_EVENT, REGISTER_FILTER_UNIT_TAG_PREFIX, "boss")
-        --EVENT_MANAGER:AddFilterForEvent(addon.name, EVENT_COMBAT_EVENT, REGISTER_FILTER_TARGET_COMBAT_UNIT_TYPE, COMBAT_UNIT_TYPE_NONE)
     end
 end
 
@@ -90,7 +92,7 @@ end
 
 --[[  ]]
 function Events:CombatEvent(eventCode, result, isError, abilityName, abilityGraphic, abilityActionSlotType, sourceName, sourceType, targetName, targetType, hitValue, powerType, damageType, log, sourceUnitId, targetUnitId, abilityId, overflow)
-    if addon.ZoneGuideTracker:RegisterKill(targetName) then
+    if addon.ZoneGuideTracker:RegisterDelveKill(targetName) then
         addon.Utility.Debug("EVENT_COMBAT_EVENT(" .. tostring(eventCode) .. ", result: "..tostring(result) .. ", isError: "..tostring(isError) 
             .. ", sourceName: "..tostring(sourceName) .. ", sourceType: " .. tostring(sourceType) .. ", targetName: "..tostring(targetName) .. ", targetType: "..tostring(targetType) 
             .. ", source: "..tostring(sourceUnitId) .. ", target: "..tostring(targetUnitId)
@@ -100,11 +102,10 @@ end
 
 --[[  ]]
 function Events:ExperienceUpdate(eventCode, unitTag, currentExp, maxExp, reason)
-    if not BOSS_KILL_REASONS[reason] then
+    if reason ~= PROGRESS_REASON_OVERLAND_BOSS_KILL then
         return
     end
-    local unitName = GetUnitName(unitTag)
-    if addon.ZoneGuideTracker:RegisterKill(nil, reason) then
+    if addon.ZoneGuideTracker:RegisterWorldBossKill(reason) then
         addon.Utility.Debug("EVENT_EXPERIENCE_UPDATE(" .. tostring(eventCode) .. ", unitTag: "..tostring(unitTag) .. ", unitName: "..tostring(unitName) .. ", currentExp: "..tostring(currentExp) .. ", maxExp: " .. tostring(maxExp) .. ", reason: " .. tostring(reason) .. ")", debug)
     end
 end
@@ -121,22 +122,49 @@ function Events:PlayerActivated(eventCode, initial)
     local zoneId = GetZoneId(zoneIndex)
     addon.Utility.Debug("EVENT_PLAYER_ACTIVATED(" .. tostring(eventCode) .. ", "..tostring(initial) .. ", zoneId: "..tostring(zoneId) .. ", zoneIndex: "..tostring(zoneIndex) .. ")", debug)
     addon.ZoneGuideTracker:InitializeZone(zoneIndex)
+    addon.ZoneGuideTracker:InitializeAllZonesAsync()
 end
 
 --[[  ]]
 function Events:PowerUpdate(eventCode, unitTag, powerIndex, powerType, powerValue, powerMax, powerEffectiveMax)
+    local unitName = GetUnitName(unitTag)
+    addon.Utility.Debug("EVENT_POWER_UPDATE(" .. tostring(eventCode) .. ", unitTag: "..tostring(unitTag) .. ", unitName: " .. tostring(unitName) .. ", powerIndex: "..tostring(powerIndex) .. ", powerType: "..tostring(powerType) .. ", powerValue: " .. tostring(powerValue) ..", powerMax: " .. tostring(powerMax) ..", powerEffectiveMax: " .. tostring(powerEffectiveMax)  .. ")", debug)
     if powerMax < DELVE_BOSS_MAX_HP then
         return
     end
-    local unitName = GetUnitName(unitTag)
     if powerMax == DELVE_BOSS_MAX_HP then
         addon.ZoneGuideTracker:RegisterDelveBossName(unitName)
-    elseif IsUnitInDungeon("player") then
+    --[[elseif IsUnitInDungeon("player") then
+        -- TODO: register dungeon boss name
         return
     else
-        addon.ZoneGuideTracker:RegisterWorldBossName(unitName)
+        addon.ZoneGuideTracker:RegisterWorldBossName(unitName)]]
     end
     addon.Utility.Debug("EVENT_POWER_UPDATE(" .. tostring(eventCode) .. ", unitTag: "..tostring(unitTag) .. ", unitName: "..tostring(unitName) .. ", powerIndex: "..tostring(powerIndex) .. ", powerType: " .. tostring(powerType) .. ", powerValue: " .. tostring(powerValue) .. ", powerMax: " .. tostring(powerMax) .. ", powerEffectiveMax: " .. tostring(powerEffectiveMax) .. ")", debug)
+end
+
+function Events:ReticleTargetChanged(eventCode)
+    -- If in the overland, we're obviously not in a delve.
+    if not IsUnitInDungeon("player") then
+        return
+    end
+    local unitTag = "reticleover"
+    
+    -- Only "normal" difficulty monsters count as delve bosses. Easy, hard and deadly monsters must be something else.
+    local difficulty = GetUnitDifficulty(unitTag)
+    if difficulty ~= MONSTER_DIFFICULTY_NORMAL then
+        return
+    end
+    
+    -- Non-hostile units are not delve bosses
+    local unitReaction = GetUnitReaction(unitTag)
+    if unitReaction ~= UNIT_REACTION_HOSTILE then
+        return
+    end
+    
+    local unitName = GetUnitName(unitTag) 
+    addon.ZoneGuideTracker:RegisterDelveBossName(unitName)
+    addon.Utility.Debug("EVENT_RETICLE_TARGET_CHANGED(" .. tostring(eventCode) .. ", unitName: "..tostring(unitName) .. ")", debug)
 end
 
 function Events:TrackedZoneStoryActivityCompleted(eventCode, zoneId, zoneCompletionType, activityId)
