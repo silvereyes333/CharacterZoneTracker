@@ -1,5 +1,5 @@
 local addon = CharacterZonesAndBosses
-local debug = true
+local debug = false
 local trueCount, containsAnyUntrue
 
 local Data = ZO_Object:Subclass()
@@ -78,6 +78,12 @@ function Data:GetNumCompletedActivities(zoneId, completionType)
     return self.esoui.GetNumCompletedZoneActivitiesForZoneCompletionType(zoneId, completionType)
 end
 
+function Data:GetIsMultiBossDelveBossKilled(zoneId, bossIndex)
+    return self.save.delveBossKills
+           and self.save.delveBossKills[zoneId]
+           and self.save.delveBossKills[zoneId][bossIndex]
+end
+
 function Data:GetPOIMapInfo(zoneIndex, poiIndex)
     addon.ZoneGuideTracker:InitializeZone(zoneIndex)
     local poiObjective, completionType = addon.ZoneGuideTracker:GetPOIObjective(nil, poiIndex)
@@ -123,6 +129,16 @@ function Data:SetActivityComplete(zoneId, completionType, activityIndex, complet
     end
     self.save[zoneId][completionType][activityIndex] = complete
     return true
+end
+
+function Data:SetMultiBossDelveBossKilled(zoneId, bossIndex)
+    if not self.save.delveBossKills then
+        self.save.delveBossKills = {}
+    end
+    if not self.save.delveBossKills[zoneId] then
+        self.save.delveBossKills[zoneId] = {}
+    end
+    self.save.delveBossKills[zoneId][bossIndex] = true
 end
 
 ---------------------------------------

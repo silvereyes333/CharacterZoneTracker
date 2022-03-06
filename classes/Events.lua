@@ -6,12 +6,6 @@
   
 local addon = CharacterZonesAndBosses
 local debug = true
-local DELVE_BOSS_MAX_HP = 133844
-local DELVE_BOSS_MAX_HP2 = 103494
-local DELVE_BOSS_MAX_HP3 = 146590
-local DELVE_BOSS_MAX_HP4 = 127470
-local DELVE_BOSS_MAX_HP5 = 66924
-local BOSS_KILL_REASONS = { [PROGRESS_REASON_BOSS_KILL] = true, [PROGRESS_REASON_OVERLAND_BOSS_KILL] = true }
 
 -- Singleton class
 local Events = ZO_Object:Subclass()
@@ -150,9 +144,9 @@ function Events:ReticleTargetChanged(eventCode)
     end
     local unitTag = "reticleover"
     
-    -- Only "normal" difficulty monsters count as delve bosses. Easy, hard and deadly monsters must be something else.
+    -- Ignore trash mobs
     local difficulty = GetUnitDifficulty(unitTag)
-    if difficulty ~= MONSTER_DIFFICULTY_NORMAL then
+    if difficulty < MONSTER_DIFFICULTY_NORMAL then
         return
     end
     

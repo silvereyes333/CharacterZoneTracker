@@ -258,14 +258,22 @@ function ZoneGuideTracker:RegisterDelveKill(name)
     if not delve or not IsUnitInDungeon("player") then
         return
     end
-    if not name or not self.delveBossNames[name] then
+    
+    local zoneId = GetZoneId(zoneIndex)
+    if addon.MultiBossDelves:IsZoneMultiBossDelve(zoneId) then
+        addon.MultiBossDelves:RegisterBossKill(zoneId, name)
+        if not addon.MultiBossDelves:AreAllBossesKilled(zoneId) then
+            return
+        end
+        
+    elseif not name or not self.delveBossNames[name] then
         addon.Utility.Debug("Not registering delve kill for "..tostring(delve.name) .. ", zone id: " .. delve.zoneId .. " because target name " .. tostring(name) .. " is not found in the known delve boss names list.", debug)
         return
     end
     
-    local zoneId = GetZoneId(delve.parentZoneIndex)
+    local parentZoneId = GetZoneId(delve.parentZoneIndex)
     addon.Utility.Debug("Setting delve "..tostring(delve.name) .. ", zone id: " .. delve.zoneId .. " as complete.", debug)
-    if addon.Data:SetActivityComplete(zoneId, ZONE_COMPLETION_TYPE_DELVES, delve.objective.activityIndex) then
+    if addon.Data:SetActivityComplete(parentZoneId, ZONE_COMPLETION_TYPE_DELVES, delve.objective.activityIndex) then
         -- Announce it was complete and refresh UI
         self:UpdateUIAndAnnounce(delve.objective, true)
     end

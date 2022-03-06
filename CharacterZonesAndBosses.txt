@@ -11,6 +11,7 @@
 CharacterZonesAndBosses.lua
 classes/Data.lua
 classes/Events.lua
+classes/MultiBossDelves.lua
 classes/Utility.lua
 classes/WorldMap.lua
 classes/ZoneGuideTracker.lua
