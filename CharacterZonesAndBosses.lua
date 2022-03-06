@@ -1,9 +1,9 @@
--- Character Zone and Boss Achievements Addon for Elder Scrolls Online
+-- Character Zone and Boss Completion Addon for Elder Scrolls Online
 -- Author: silvereyes
 
 CharacterZonesAndBosses = {
     name = "CharacterZonesAndBosses",
-    title = "Character Zone and Boss Achievements",
+    title = "Character Zone and Boss Completion",
     version = "1.0.0",
     author = "silvereyes",
 }
@@ -20,6 +20,16 @@ local onAddonLoaded
 -- 
 ---------------------------------------
 
+function CharacterZonesAndBosses_OnKeyboardLoadAccountButtonClick(control)
+    local worldMap = addon.WorldMap -- get singleton
+    worldMap:OnKeyboardLoadAccountButtonClick(control)
+end
+
+function CharacterZonesAndBosses_OnKeyboardResetButtonClick(control)
+    local worldMap = addon.WorldMap -- get singleton
+    worldMap:OnKeyboardResetButtonClick(control)
+end
+
 
 ---------------------------------------
 --
@@ -32,6 +42,12 @@ function onAddonLoaded(event, name)
     EVENT_MANAGER:UnregisterForEvent(addon.name, EVENT_ADD_ON_LOADED)
     
     addon.Events:Initialize()
+    
+    -- Everything below this point should only run after Update 33 comes out
+    if GetAPIVersion() < 101033 then
+        return
+    end
+  
     addon.WorldMap:Initialize()
 end
 

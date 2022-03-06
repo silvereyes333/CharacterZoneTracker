@@ -6,7 +6,10 @@
   
 local addon = CharacterZonesAndBosses
 local debug = true
+local CBZ_DIALOG_NAME_CONFIRM_ZONE_RESET = addon.name .. "_ConfirmZoneReset"
+local CBZ_DIALOG_NAME_CONFIRM_LOAD_ACCOUNT = addon.name .. "_ConfirmLoadAccount"
 local COLOR_NORMAL = ZO_ColorDef:New(GetInterfaceColor(INTERFACE_COLOR_TYPE_TEXT_COLORS, INTERFACE_TEXT_COLOR_NORMAL))
+local COLOR_QUALITY_ARTIFACT = ZO_ColorDef:New(GetInterfaceColor(INTERFACE_COLOR_TYPE_ITEM_QUALITY_COLORS, ITEM_DISPLAY_QUALITY_ARTIFACT))
 local getPinDetails, getCompleteText, getResetText, markPinComplete, markPinIncomplete, shouldPinShowCompletionMenu
 
 -- Singleton class
@@ -78,6 +81,63 @@ function WorldMap:Initialize()
     -- Hook pin click menu creation events to remove the dummy handler menu entry before display.
     ZO_PreHook("ZO_WorldMap_SetupGamepadChoiceDialog", function(...) self:PrehookSetupPinChoiceMenu(...) end)
     ZO_PreHook("ZO_WorldMap_SetupKeyboardChoiceMenu", function(...) self:PrehookSetupPinChoiceMenu(...) end)
+
+    -- Replace keyboard world map completion background with the tall version, to add room for our buttons
+    function ZO_WorldMapZoneStory_Keyboard:GetBackgroundFragment()
+        return MEDIUM_TALL_LEFT_PANEL_BG_FRAGMENT
+    end
+    
+    -- Map completion reset button dialog
+    ESO_Dialogs[CBZ_DIALOG_NAME_CONFIRM_ZONE_RESET] =
+    {
+        title = {
+            text = SI_CZB_RESET_ACTION,
+        },
+        mainText = {
+            text = SI_CZB_RESET_CONFIRM,
+            align = TEXT_ALIGN_CENTER
+        },
+        buttons = {
+            [1] = {
+                text = SI_OPTIONS_RESET,
+                callback = function(dialog)
+                    addon.ZoneGuideTracker:ResetCurrentZone()
+                end
+            },
+            [2] = {
+                text = SI_DIALOG_CANCEL
+            }
+        }
+    }
+    
+    -- Show the reset button
+    CharacterZonesAndBosses_KeyboardResetButton:SetHidden(false)
+    
+    -- Map completion load account button dialog
+    ESO_Dialogs[CBZ_DIALOG_NAME_CONFIRM_LOAD_ACCOUNT] =
+    {
+        title = {
+            text = SI_CZB_LOAD_ACCOUNT_ACTION,
+        },
+        mainText = {
+            text = SI_CZB_LOAD_ACCOUNT_CONFIRM,
+            align = TEXT_ALIGN_CENTER
+        },
+        buttons = {
+            [1] = {
+                text = SI_CZB_LOAD,
+                callback = function(dialog)
+                    addon.ZoneGuideTracker:LoadAccountWideForCurrentZone()
+                end
+            },
+            [2] = {
+                text = SI_DIALOG_CANCEL
+            }
+        }
+    }
+    
+    -- Show the load account button
+    CharacterZonesAndBosses_KeyboardLoadAccountButton:SetHidden(false)
 end
 
 
@@ -99,6 +159,24 @@ function WorldMap:PrehookSetupPinChoiceMenu(pinDatas)
             end
         end
     end
+end
+
+function WorldMap:OnKeyboardLoadAccountButtonClick(control)
+    local zoneIndex = GetCurrentMapZoneIndex()
+    local zoneName = GetZoneNameByIndex(zoneIndex)
+    ZO_Dialogs_ShowDialog(CBZ_DIALOG_NAME_CONFIRM_LOAD_ACCOUNT, nil, {
+				titleParams = { },
+				mainTextParams = { ZO_HIGHLIGHT_TEXT:Colorize(zoneName) },
+			})
+end
+
+function WorldMap:OnKeyboardResetButtonClick(control)
+    local zoneIndex = GetCurrentMapZoneIndex()
+    local zoneName = GetZoneNameByIndex(zoneIndex)
+    ZO_Dialogs_ShowDialog(CBZ_DIALOG_NAME_CONFIRM_ZONE_RESET, nil, {
+				titleParams = { },
+				mainTextParams = { ZO_HIGHLIGHT_TEXT:Colorize(zoneName) },
+			})
 end
 
 
@@ -145,7 +223,7 @@ function markPinIncomplete(pin)
     if not objective then
         return
     end
-    addon.Data:SetActivityComplete(zoneId, completionType, objective.activityIndex, false)
+    addon.Data:SetActivityComplete(zoneId, completionType, objective.activityIndex, nil)
     addon.ZoneGuideTracker:UpdateUIAndAnnounce(objective, false)
     -- TODO: show reset message
 end

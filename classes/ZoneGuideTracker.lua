@@ -66,7 +66,7 @@ function ZoneGuideTracker:DeactivateWorldEventInstance()
     self.activeWorldEvent = nil
     local zoneId = GetZoneId(worldEventObjective.zoneIndex)
     addon.Utility.Debug("Setting world event  "..tostring(worldEventObjective.name) .. ", zone id: " .. tostring(zoneId) .. ", activityIndex: " .. tostring(worldEventObjective.activityIndex) .. " as complete.", debug)
-    if addon.Data:SetActivityComplete(zoneId, ZONE_COMPLETION_TYPE_WORLD_EVENTS, worldEventObjective.activityIndex) then
+    if addon.Data:SetActivityComplete(zoneId, ZONE_COMPLETION_TYPE_WORLD_EVENTS, worldEventObjective.activityIndex, true) then
         -- Announce it was complete and refresh UI
         self:UpdateUIAndAnnounce(worldEventObjective, true)
     end
@@ -201,8 +201,10 @@ function ZoneGuideTracker:InitializeZone(zoneIndex)
             totalActivityCount = totalActivityCount + activityCount
             self.objectives[zoneIndex][completionType] = {}
             for activityIndex = 1, GetNumZoneActivitiesForZoneCompletionType(zoneId, completionType) do
-                local objective = { name = GetZoneStoryActivityNameByActivityIndex(zoneId, completionType, activityIndex), zoneIndex = zoneIndex, activityIndex = activityIndex }
+                local objective = { name = GetZoneStoryActivityNameByActivityIndex(zoneId, completionType, activityIndex), zoneIndex = zoneIndex, activityIndex = activityIndex, poiId = GetZoneActivityIdForZoneCompletionType(zoneId, completionType, activityIndex) }
+                local _, poiIndex = GetPOIIndices(objective.poiId)
                 objective.poiIndex = self.pointsOfInterest[zoneIndex][objective.name]
+                objective.lookedUpPOIIndex = poiIndex
                 objective.mapPinType = select(3, GetPOIMapInfo(zoneIndex, objective.poiIndex))
                 if completionType == ZONE_COMPLETION_TYPE_WORLD_EVENTS then
                     if objective.poiIndex then
@@ -233,19 +235,16 @@ function ZoneGuideTracker:IsCompletionTypeTracked(completionType)
     return COMPLETION_TYPES[completionType]
 end
 
-function ZoneGuideTracker:UpdateUIAndAnnounce(objective, complete)
-  -- Refresh pins
-    ZO_WorldMap_RefreshAllPOIs()
-    -- Refresh zone guide
-    if IsInGamepadPreferredMode() then
-        WORLD_MAP_ZONE_STORY_GAMEPAD:RefreshInfo()
-        GAMEPAD_WORLD_MAP_INFO_ZONE_STORY:RefreshInfo()
-    else
-        WORLD_MAP_ZONE_STORY_KEYBOARD:RefreshInfo()
+function ZoneGuideTracker:LoadAccountWideForCurrentZone()
+    local zoneIndex = GetCurrentMapZoneIndex()
+    local zoneId = GetZoneId(zoneIndex)
+    local _
+    for completionType, _ in pairs(COMPLETION_TYPES) do
+        for activityIndex = 1, GetNumZoneActivitiesForZoneCompletionType(zoneId, completionType) do
+            addon.Data:LoadAccountWideCompletion(zoneId, completionType, activityIndex)
+        end
     end
-    if complete then
-        addon.ZoneGuideTracker:AnnounceCompletion(objective)
-    end
+    self:UpdateUI()
 end
 
 function ZoneGuideTracker:RegisterDelveKill(name)
@@ -273,7 +272,7 @@ function ZoneGuideTracker:RegisterDelveKill(name)
     
     local parentZoneId = GetZoneId(delve.parentZoneIndex)
     addon.Utility.Debug("Setting delve "..tostring(delve.name) .. ", zone id: " .. delve.zoneId .. " as complete.", debug)
-    if addon.Data:SetActivityComplete(parentZoneId, ZONE_COMPLETION_TYPE_DELVES, delve.objective.activityIndex) then
+    if addon.Data:SetActivityComplete(parentZoneId, ZONE_COMPLETION_TYPE_DELVES, delve.objective.activityIndex, true) then
         -- Announce it was complete and refresh UI
         self:UpdateUIAndAnnounce(delve.objective, true)
     end
@@ -303,7 +302,7 @@ function ZoneGuideTracker:RegisterWorldBossKill(experienceUpdateReason)
     
     local zoneId = GetZoneId(zoneIndex)
     addon.Utility.Debug("Setting world boss "..tostring(worldBossObjective.name) .. ", zone id: " .. zoneId .. " as complete.", debug)
-    if addon.Data:SetActivityComplete(zoneId, ZONE_COMPLETION_TYPE_GROUP_BOSSES, worldBossObjective.activityIndex) then
+    if addon.Data:SetActivityComplete(zoneId, ZONE_COMPLETION_TYPE_GROUP_BOSSES, worldBossObjective.activityIndex, true) then
         -- Announce it was complete and refresh UI
         self:UpdateUIAndAnnounce(worldBossObjective, true)
     end
@@ -312,6 +311,17 @@ end
 
 function ZoneGuideTracker:RegisterDelveBossName(name)
     self.delveBossNames[name] = true
+end
+
+function ZoneGuideTracker:ResetCurrentZone()
+    local zoneIndex = GetCurrentMapZoneIndex()
+    local zoneId = GetZoneId(zoneIndex)
+    for completionType, _ in pairs(COMPLETION_TYPES) do
+        for activityIndex = 1, GetNumZoneActivitiesForZoneCompletionType(zoneId, completionType) do
+            addon.Data:SetActivityComplete(zoneId, completionType, activityIndex, nil)
+        end
+    end
+    self:UpdateUI()
 end
 
 --[[function ZoneGuideTracker:RegisterWorldBossName(name)
@@ -333,6 +343,25 @@ function ZoneGuideTracker:SetActiveWorldEventInstanceId(worldEventInstanceId)
         zoneIndex = zoneIndex,
         poiIndex = poiIndex,
     }
+end
+
+function ZoneGuideTracker:UpdateUI()
+    -- Refresh pins
+    ZO_WorldMap_RefreshAllPOIs()
+    -- Refresh zone guide
+    if IsInGamepadPreferredMode() then
+        WORLD_MAP_ZONE_STORY_GAMEPAD:RefreshInfo()
+        GAMEPAD_WORLD_MAP_INFO_ZONE_STORY:RefreshInfo()
+    else
+        WORLD_MAP_ZONE_STORY_KEYBOARD:RefreshInfo()
+    end
+end
+
+function ZoneGuideTracker:UpdateUIAndAnnounce(objective, complete)
+    self:UpdateUI()
+    if complete then
+        addon.ZoneGuideTracker:AnnounceCompletion(objective)
+    end
 end
 
 

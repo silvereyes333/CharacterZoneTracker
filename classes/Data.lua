@@ -14,6 +14,7 @@ function Data:Initialize()
     
     self.initialized = true
     self.save = LibSavedVars:NewCharacterSettings(addon.name .. "Data", {})
+                            :EnableDefaultsTrimming()
     self.esoui = {}
     
     self.esouiNames = {
@@ -82,6 +83,7 @@ function Data:GetIsMultiBossDelveBossKilled(zoneId, bossIndex)
     return self.save.delveBossKills
            and self.save.delveBossKills[zoneId]
            and self.save.delveBossKills[zoneId][bossIndex]
+           or false
 end
 
 function Data:GetPOIMapInfo(zoneIndex, poiIndex)
@@ -107,27 +109,39 @@ function Data:IsActivityComplete(zoneId, completionType, activityIndex)
     addon.Utility.Debug("IsActivityComplete(zoneId: " .. tostring(zoneId) .. ", completionType: " .. tostring(completionType) .. ", activityIndex: " .. tostring(activityIndex) .. ")", debug)
     if addon.ZoneGuideTracker:IsCompletionTypeTracked(completionType) then
         addon.Utility.Debug("Returning " .. tostring(self.save[zoneId] and self.save[zoneId][completionType] and self.save[zoneId][completionType][activityIndex]), debug)
-        return self.save[zoneId] and self.save[zoneId][completionType] and self.save[zoneId][completionType][activityIndex]
+        return self.save[zoneId] and self.save[zoneId][completionType] and self.save[zoneId][completionType][activityIndex] or false
     end
     return self.esoui.IsZoneStoryActivityComplete(zoneId, completionType)
 end
 
 --[[  ]]
+function Data:LoadAccountWideCompletion(zoneId, completionType, activityIndex)
+    local accountWideComplete = self.esoui.IsZoneStoryActivityComplete(zoneId, completionType, activityIndex)
+    self:SetActivityComplete(zoneId, completionType, activityIndex, accountWideComplete)
+end
+
+--[[  ]]
 function Data:SetActivityComplete(zoneId, completionType, activityIndex, complete)
-    if complete == nil then
-        complete = true
-    end
     addon.Utility.Debug("SetActivityComplete(zoneId: " .. tostring(zoneId) .. ", completionType: " .. tostring(completionType) .. ", activityIndex: " .. tostring(activityIndex) .. ", complete: " .. tostring(complete) .. ")", debug)
     if not addon.ZoneGuideTracker:IsCompletionTypeTracked(completionType) then
         return
     end
     if not self.save[zoneId] then
-        self.save[zoneId] = {}
+        if complete then
+            self.save[zoneId] = {}
+        else
+            return
+        end
     end
     if not self.save[zoneId][completionType] then
-        self.save[zoneId][completionType] = {}
+        if complete then
+            self.save[zoneId][completionType] = {}
+        else
+            return
+        end
     end
-    self.save[zoneId][completionType][activityIndex] = complete
+    self.save[zoneId][completionType][activityIndex] = complete or nil
+    
     return true
 end
 
@@ -154,7 +168,8 @@ function containsAnyUntrue(self, zoneId, completionType)
                 return true
             end
         end
-    end  
+    end
+    return false
 end
 
 function trueCount(self, zoneId, completionType)
