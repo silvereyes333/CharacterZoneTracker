@@ -23,13 +23,8 @@ function Data:Initialize()
         GetNumCompletedActivities = "GetNumCompletedZoneActivitiesForZoneCompletionType",
         IsActivityComplete = "IsZoneStoryActivityComplete",
         GetPOIMapInfo = "GetPOIMapInfo",
+        GetPOIPinIcon = "GetPOIPinIcon",
     }
-    
-    --[[
-      GetPOIPinIcon(number poiId, boolean checkNearby)
-      Returns: textureName icon, number MapDisplayPinType poiPinType
-         Note: use Search on ESOUI Source Code GetPOIIndices(number poiId) Returns: number zoneIndex, number poiIndex
-    ]]
     
     for handlerName, methodName in pairs(self.esouiNames) do
         local method = _G[methodName]
@@ -71,6 +66,13 @@ function Data:CanActivitiesContinue(zoneId, completionType)
     return self.esoui.CanZoneStoryContinueTrackingActivitiesForCompletionType(zoneId, completionType)
 end
 
+function Data:GetIsMultiBossDelveBossKilled(zoneId, bossIndex)
+    return self.save.delveBossKills
+           and self.save.delveBossKills[zoneId]
+           and self.save.delveBossKills[zoneId][bossIndex]
+           or false
+end
+
 --[[  ]]
 function Data:GetNumCompletedActivities(zoneId, completionType)
     if addon.ZoneGuideTracker:IsCompletionTypeTracked(completionType) then
@@ -79,14 +81,8 @@ function Data:GetNumCompletedActivities(zoneId, completionType)
     return self.esoui.GetNumCompletedZoneActivitiesForZoneCompletionType(zoneId, completionType)
 end
 
-function Data:GetIsMultiBossDelveBossKilled(zoneId, bossIndex)
-    return self.save.delveBossKills
-           and self.save.delveBossKills[zoneId]
-           and self.save.delveBossKills[zoneId][bossIndex]
-           or false
-end
-
 function Data:GetPOIMapInfo(zoneIndex, poiIndex)
+  
     addon.ZoneGuideTracker:InitializeZone(zoneIndex)
     local poiObjective, completionType = addon.ZoneGuideTracker:GetPOIObjective(nil, poiIndex)
     local xLoc, zLoc, poiPinType, icon, isShownInCurrentMap, linkedCollectibleIsLocked, isDiscovered, isNearby = self.esoui.GetPOIMapInfo(zoneIndex, poiIndex)
@@ -102,6 +98,13 @@ function Data:GetPOIMapInfo(zoneIndex, poiIndex)
         end
     end
     return xLoc, zLoc, poiPinType, icon, isShownInCurrentMap, linkedCollectibleIsLocked, isDiscovered, isNearby 
+end
+
+--[[  ]]
+function Data:GetPOIPinIcon(poiId, checkNearby)
+    local zoneIndex, poiIndex = GetPOIIndices(poiId)
+    local _, _, poiPinType, icon = self:GetPOIMapInfo(zoneIndex, poiIndex)
+    return icon, poiPinType
 end
 
 --[[  ]]

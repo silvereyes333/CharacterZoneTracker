@@ -13,6 +13,7 @@ localization\$(language).lua
 localization\CreateStrings.lua
 
 CharacterZonesAndBosses.lua
+classes/Compass.lua
 classes/Data.lua
 classes/Events.lua
 classes/MultiBossDelves.lua

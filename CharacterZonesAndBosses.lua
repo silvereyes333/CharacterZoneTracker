@@ -48,6 +48,7 @@ function onAddonLoaded(event, name)
         return
     end
   
+    addon.Compass:Initialize()
     addon.WorldMap:Initialize()
 end
 

@@ -8,7 +8,7 @@ local ZoneGuideTracker = ZO_Object:Subclass()
 
 local name = addon.name .. "ZoneGuideTracker"
 local debug = true
-local isPlayerNearObjective, matchPoiIndex
+local isPlayerNearObjective, matchObjectiveName, matchPoiIndex
 
 
 ---------------------------------------
@@ -53,11 +53,14 @@ end
 
 function ZoneGuideTracker:DeactivateWorldEventInstance()
     if not self.activeWorldEvent then
+        addon.Utility.Debug("No active world event instance being tracked. Cannot mark it complete.", debug)
         return
     end
+    addon.Utility.Debug("Deactivating active world event poiIndex " .. tostring(self.activeWorldEvent.poiIndex), debug)
     local activePoiIndex = self.activeWorldEvent.poiIndex
     local worldEventObjective = self:GetObjectivePlayerIsNear(ZONE_COMPLETION_TYPE_WORLD_EVENTS)
     if not worldEventObjective or worldEventObjective.poiIndex ~= activePoiIndex then
+        addon.Utility.Debug("The nearest world event objective, " .. tostring(worldEventObjective.name) .. " has a poiIndex of " .. tostring(worldEventObjective.poiIndex) .. ". Exiting.", debug)
         return
     end
     -- Point of interest completed was the one the player is near.
@@ -91,7 +94,7 @@ function ZoneGuideTracker:FindBestZoneCompletionActivityNameMatch(zoneId, name, 
     return match, lowestLevenshteinDistance
 end
 
-function ZoneGuideTracker:FindObjective(match, completionType, ...)
+function ZoneGuideTracker:FindObjective(matchFunction, completionType, ...)
     local zoneIndex = GetCurrentMapZoneIndex()
     if not zoneIndex or not self.objectives[zoneIndex] then
         return
@@ -104,7 +107,7 @@ function ZoneGuideTracker:FindObjective(match, completionType, ...)
     end
     for completionType, objectives in pairs(objectivesList) do
         for activityIndex, objective in ipairs(objectives) do
-            if match(objective, zoneIndex, ...) then
+            if matchFunction(objective, zoneIndex, ...) then
                 return objective, completionType
             end
         end
@@ -117,6 +120,10 @@ end
 
 function ZoneGuideTracker:GetPOIObjective(completionType, poiIndex)
     return self:FindObjective(matchPoiIndex, completionType, poiIndex)
+end
+
+function ZoneGuideTracker:GetObjectiveByName(objectiveName, completionType, ...)
+    return self:FindObjective(matchObjectiveName, completionType, objectiveName)
 end
 
 function ZoneGuideTracker:InitializeAllZonesAsync(startZoneIndex)
@@ -262,6 +269,7 @@ function ZoneGuideTracker:RegisterDelveKill(name)
     if addon.MultiBossDelves:IsZoneMultiBossDelve(zoneId) then
         addon.MultiBossDelves:RegisterBossKill(zoneId, name)
         if not addon.MultiBossDelves:AreAllBossesKilled(zoneId) then
+            addon.Utility.Debug("Not all bosses in "..tostring(delve.name) .. ", zone id: " .. delve.zoneId .. " are killed yet.", debug)
             return
         end
         
@@ -283,6 +291,7 @@ function ZoneGuideTracker:RegisterWorldBossKill(experienceUpdateReason)
     
     -- Ignore non-delve boss XP increase kills
     if experienceUpdateReason ~= PROGRESS_REASON_OVERLAND_BOSS_KILL then
+        addon.Utility.Debug("Not registering a world boss kill because XP update reason " .. tostring(experienceUpdateReason) .. " is not an overland boss kill.", debug)
         return
     end
     
@@ -292,11 +301,13 @@ function ZoneGuideTracker:RegisterWorldBossKill(experienceUpdateReason)
     end
     -- Must be in overland
     if IsUnitInDungeon("player") then
+        addon.Utility.Debug("Not registering a world boss kill because the player is in a dungeon.", debug)
         return
     end
     
     local worldBossObjective = self:GetObjectivePlayerIsNear(ZONE_COMPLETION_TYPE_GROUP_BOSSES)
     if not worldBossObjective then
+        addon.Utility.Debug("Not registering a world boss kill because none could be found near the player.", debug)
         return
     end
     
@@ -346,9 +357,11 @@ function ZoneGuideTracker:SetActiveWorldEventInstanceId(worldEventInstanceId)
 end
 
 function ZoneGuideTracker:UpdateUI()
-    -- Refresh pins
+    -- Refresh world map pins
     ZO_WorldMap_RefreshAllPOIs()
-    -- Refresh zone guide
+    -- Refresh compass pins
+    COMPASS:OnUpdate()
+    -- Refresh zone guide progress bars
     if IsInGamepadPreferredMode() then
         WORLD_MAP_ZONE_STORY_GAMEPAD:RefreshInfo()
         GAMEPAD_WORLD_MAP_INFO_ZONE_STORY:RefreshInfo()
@@ -383,6 +396,10 @@ function isPlayerNearObjective(objective, zoneIndex)
     if isNearby then
         return true
     end
+end
+
+function matchObjectiveName(objective, zoneIndex, objectiveName)
+    return objective.name == objectiveName
 end
 
 function matchPoiIndex(objective, zoneIndex, poiIndex)
