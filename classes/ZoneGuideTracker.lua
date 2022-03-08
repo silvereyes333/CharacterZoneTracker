@@ -51,6 +51,14 @@ function ZoneGuideTracker:AnnounceCompletion(objective)
     CENTER_SCREEN_ANNOUNCE:DisplayMessage(messageParams)
 end
 
+function ZoneGuideTracker:ClearActiveWorldEventInstance()
+    if not self.activeWorldEvent then
+        return
+    end
+    ZO_ClearTable(self.activeWorldEvent)
+    self.activeWorldEvent = nil
+end
+
 function ZoneGuideTracker:DeactivateWorldEventInstance()
     if not self.activeWorldEvent then
         addon.Utility.Debug("No active world event instance being tracked. Cannot mark it complete.", debug)
