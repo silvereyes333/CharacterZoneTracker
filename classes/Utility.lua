@@ -20,6 +20,12 @@ function addon.Utility.Debug(input, force)
     d("[CZB] " .. input)
 end
 
+function addon.Utility.CartesianDistance2D(x1, y1, x2, y2)
+    local dx = x2 - x1
+    local dy = y2 - y1
+    return math.sqrt(dx * dx + dy * dy)
+end
+
 -- Returns the Levenshtein distance between the two given strings
 -- Full credit to Badgerati (Matthew Kelley)
 -- https://gist.github.com/Badgerati/3261142
@@ -62,4 +68,9 @@ function addon.Utility.Levenshtein(str1, str2)
 	
         -- return the last value - this is the Levenshtein distance
 	return matrix[len1][len2]
+end
+
+--[[ Outputs formatted message to chat window ]]
+function addon.Utility.Print(output)
+    addon.Utility.chat:Print(output)
 end

@@ -11,14 +11,17 @@ CharacterZonesAndBosses = {
 -- Local declarations
 local addon = CharacterZonesAndBosses
 local onAddonLoaded
+local COMPLETION_TYPES
 
 
 
 ---------------------------------------
 --
---          Public Methods
+--          Public Members
 -- 
 ---------------------------------------
+
+addon.Chat = LibChatMessage(addon.name, "CZB")
 
 function CharacterZonesAndBosses_OnKeyboardLoadAccountButtonClick(control)
     local worldMap = addon.WorldMap -- get singleton
@@ -30,10 +33,18 @@ function CharacterZonesAndBosses_OnKeyboardResetButtonClick(control)
     worldMap:OnKeyboardResetButtonClick(control)
 end
 
+function CharacterZonesAndBosses:GetCompletionTypes()
+    return COMPLETION_TYPES
+end
+
+function CharacterZonesAndBosses:IsCompletionTypeTracked(completionType)
+    return COMPLETION_TYPES[completionType]
+end
+
 
 ---------------------------------------
 --
---          Private Methods
+--          Private Members
 -- 
 ---------------------------------------
 
@@ -51,6 +62,12 @@ function onAddonLoaded(event, name)
     addon.Compass:Initialize()
     addon.WorldMap:Initialize()
 end
+
+COMPLETION_TYPES = {
+    [ZONE_COMPLETION_TYPE_DELVES] = true, -- IsUnitInDungeon("player") == true
+    [ZONE_COMPLETION_TYPE_GROUP_BOSSES] = true,
+    [ZONE_COMPLETION_TYPE_WORLD_EVENTS] = true,
+}
 
 
 

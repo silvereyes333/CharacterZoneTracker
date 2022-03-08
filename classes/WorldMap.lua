@@ -127,7 +127,7 @@ function WorldMap:Initialize()
             [1] = {
                 text = SI_CZB_LOAD,
                 callback = function(dialog)
-                    addon.ZoneGuideTracker:LoadAccountWideForCurrentZone()
+                    addon.ZoneGuideTracker:LoadBaseGameCompletionForCurrentZone()
                 end
             },
             [2] = {
