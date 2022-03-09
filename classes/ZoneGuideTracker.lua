@@ -275,8 +275,9 @@ function ZoneGuideTracker:LoadBaseGameCompletionForCurrentZone()
     self:UpdateUI()
 end
 
-function ZoneGuideTracker:RegisterDelveBossName(name)
-    self.delveBossNames[name] = true
+function ZoneGuideTracker:RegisterDelveBossName(targetName)
+    targetName = zo_strformat("<<1>>", targetName)
+    self.delveBossNames[targetName] = true
 end
 
 function ZoneGuideTracker:ResetCurrentZone()
@@ -308,6 +309,7 @@ function ZoneGuideTracker:SetActiveWorldEventInstanceId(worldEventInstanceId)
 end
 
 function ZoneGuideTracker:TryRegisterDelveBossKill(targetName)
+    targetName = zo_strformat("<<1>>", targetName)
     
     local zoneIndex = GetCurrentMapZoneIndex()
     if not zoneIndex then
@@ -327,7 +329,7 @@ function ZoneGuideTracker:TryRegisterDelveBossKill(targetName)
         end
         
     elseif not targetName or not self.delveBossNames[targetName] then
-        addon.Utility.Debug("Not registering delve kill for "..tostring(delve.name) .. ", zone id: " .. delve.zoneId .. " because target name " .. tostring(name) .. " is not found in the known delve boss names list.", debug)
+        addon.Utility.Debug("Not registering delve kill for "..tostring(delve.name) .. ", zone id: " .. delve.zoneId .. " because target name " .. tostring(targetName) .. " is not found in the known delve boss names list.", debug)
         return
     end
     
@@ -340,7 +342,7 @@ function ZoneGuideTracker:TryRegisterDelveBossKill(targetName)
     return true
 end
 
-function ZoneGuideTracker:TryRegisterWorldBossKill(targetName)
+function ZoneGuideTracker:TryRegisterWorldBossKill(unitTag)
     
     if IsUnitInDungeon("player") then
         addon.Utility.Debug("Not registering a world boss kill because the player is in a dungeon.", debug)
@@ -362,13 +364,13 @@ function ZoneGuideTracker:TryRegisterWorldBossKill(targetName)
         return
     end
     
-    if not addon.BossFight:RegisterKill(targetName) then
-        addon.Utility.Debug("Target name " .. tostring(targetName) .. " is not a known boss.", debug)
+    if not addon.BossFight:RegisterKill(unitTag) then
+        addon.Utility.Debug("Boss " .. tostring(unitTag) .. " is not a known boss.", debug)
         return
     end
     
     if not addon.BossFight:AreAllBossesKilled() then
-        addon.Utility.Debug("Kill for boss " .. tostring(targetName) .. " registered, but there are more bosses waiting to be killed for this world boss fight.", debug)
+        addon.Utility.Debug("Kill for boss " .. tostring(unitTag) .. " registered, but there are more bosses waiting to be killed for this world boss fight.", debug)
         return
     end
     
@@ -379,6 +381,9 @@ function ZoneGuideTracker:TryRegisterWorldBossKill(targetName)
     else
         addon.Utility.Debug("Not announcing "..tostring(worldBossObjective.name) .. " as complete. Already completed on this character.", debug)
     end
+    
+    -- Reset boss fight
+    addon.BossFight:Reset()
     
     return true
 end

@@ -57,6 +57,7 @@ function MultiBossDelves:GetBossList(zoneId)
 end
 
 function MultiBossDelves:RegisterBossKill(zoneId, targetName)
+    targetName = zo_strformat("<<1>>", targetName)
     local bossNames = self:GetBossList(zoneId)
     if not bossNames then
         return

@@ -18,7 +18,7 @@ end
 
 function BossFight:Initialize()
     self.bossesKilled = {}
-    self.bossNames = {}
+    self.bossUnitTags = {}
 end
 
 
@@ -31,53 +31,57 @@ end
 ---------------------------------------
 
 function BossFight:AreAllBossesKilled()
-    local bossName = next(self.bossNames)
-    if not bossName then
+    local unitTag = next(self.bossUnitTags)
+    if not unitTag then
         return false
     end
     repeat
-        if not self.bossesKilled[bossName] then
+        if not self.bossesKilled[unitTag] then
             return false
         end
-        bossName = next(self.bossNames, bossName)
-    until not bossName 
+        unitTag = next(self.bossUnitTags, unitTag)
+    until not unitTag 
     addon.Utility.Debug("All bosses in fight are killed!", debug)
     return true
 end
 
-function BossFight:RegisterKill(targetName)
-    if not self.bossNames[targetName] then
+function BossFight:RegisterKill(unitTag)
+    if not self.bossUnitTags[unitTag] then
         return
     end
-    self.bossesKilled[targetName] = true
+    self.bossesKilled[unitTag] = true
     return true
 end
 
 function BossFight:Reset()
     ZO_ClearTable(self.bossesKilled)
-    ZO_ClearTable(self.bossNames)
+    ZO_ClearTable(self.bossUnitTags)
     addon.Utility.Debug("Reset boss fight.", debug)
 end
 
-function BossFight:UpdateBossNames()
-    local newBossnames = {}
+function BossFight:UpdateBossList()
+    local newBossUnitTags = {}
     local reset
-    local bossNameArray = {}
+    local bossUnitTagArray = {}
     for bossIndex = 1, MAX_BOSSES do
-        local bossName = GetUnitName("boss" .. tostring(bossIndex))
-        bossNameArray[bossIndex] = bossName
-        if bossName ~= "" then
-            newBossnames[bossName] = true
-            if not self.bossNames[bossName] then
-                addon.Utility.Debug("Did not find boss name " .. tostring(bossName) .. " in boss names list.", debug)
+        local unitTag = "boss" .. tostring(bossIndex)
+        local unitType = GetUnitType(unitTag)
+        if unitType ~= COMBAT_UNIT_TYPE_NONE then
+            bossUnitTagArray[bossIndex] = unitTag
+            newBossUnitTags[unitTag] = true
+            if not self.bossUnitTags[unitTag] then
+                addon.Utility.Debug("Did not find boss unit " .. tostring(unitTag) .. " in boss unit tags list.", debug)
                 reset = true
             end
+        elseif self.bossUnitTags[unitTag] and not self.bossesKilled[unitTag] then
+            addon.Utility.Debug("Boss unit " .. tostring(unitTag) .. " disappeared without dying.", debug)
+            reset = true
         end
     end
     if reset then
         self:Reset()
-        addon.Utility.Debug("New bosses set: " .. table.concat(bossNameArray, ", "), debug)
-        self.bossNames = newBossnames
+        addon.Utility.Debug("New bosses set: " .. table.concat(bossUnitTagArray, ", "), debug)
+        self.bossUnitTags = newBossUnitTags
     end
     return reset
 end

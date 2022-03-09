@@ -26,6 +26,7 @@ function Events:Initialize()
         [EVENT_WORLD_EVENT_DEACTIVATED]             = "WorldEventDeactivated",
         [EVENT_ZONE_CHANGED]                        = "ZoneChanged",
         [EVENT_ZONE_UPDATE]                         = "ZoneUpdate",
+        [EVENT_UNIT_DEATH_STATE_CHANGED]            = "UnitDeathStateChanged",
     }
     
     for event, handlerName in pairs(self.handlerNames) do
@@ -37,6 +38,7 @@ function Events:Initialize()
     EVENT_MANAGER:RegisterForEvent(addon.name .. "CombatEvent2", EVENT_COMBAT_EVENT, self:Closure("CombatEvent"))
     EVENT_MANAGER:AddFilterForEvent(addon.name .. "CombatEvent2", EVENT_COMBAT_EVENT, REGISTER_FILTER_COMBAT_RESULT, ACTION_RESULT_DIED_XP)
     EVENT_MANAGER:AddFilterForEvent(addon.name .. "CombatEvent2", EVENT_COMBAT_EVENT, REGISTER_FILTER_TARGET_COMBAT_UNIT_TYPE, COMBAT_UNIT_TYPE_NONE)
+    EVENT_MANAGER:AddFilterForEvent(addon.name .. "UnitDeathStateChanged", EVENT_UNIT_DEATH_STATE_CHANGED, REGISTER_FILTER_UNIT_TAG_PREFIX, "boss")
     EVENT_MANAGER:AddFilterForEvent(addon.name .. "ZoneUpdate", EVENT_ZONE_UPDATE, REGISTER_FILTER_UNIT_TAG, "player")
 end
 
@@ -49,7 +51,7 @@ end
 ---------------------------------------
 
 function Events:BossesChanged(eventCode, forceReset)
-    if addon.BossFight:UpdateBossNames() then
+    if addon.BossFight:UpdateBossList() then
         addon.Utility.Debug("EVENT_BOSSES_CHANGED(" .. tostring(eventCode) .. ", forceReset: "..tostring(forceReset) .. ")", debug)
     end
 end
@@ -67,12 +69,7 @@ function Events:CombatEvent(eventCode, result, isError, abilityName, abilityGrap
         return
     end
   
-    local success
-    if IsUnitInDungeon("player") then
-        success = addon.ZoneGuideTracker:TryRegisterDelveBossKill(targetName)
-    else
-        success = addon.ZoneGuideTracker:TryRegisterWorldBossKill(targetName)
-    end
+    local success = addon.ZoneGuideTracker:TryRegisterDelveBossKill(targetName)
     if success then
         addon.Utility.Debug("EVENT_COMBAT_EVENT(" .. tostring(eventCode) .. ", result: "..tostring(result) .. ", isError: "..tostring(isError) 
             .. ", sourceName: "..tostring(sourceName) .. ", sourceType: " .. tostring(sourceType) .. ", targetName: "..tostring(targetName) .. ", targetType: "..tostring(targetType) 
@@ -86,7 +83,7 @@ function Events:PlayerActivated(eventCode, initial)
     local zoneId = GetZoneId(zoneIndex)
     addon.Utility.Debug("EVENT_PLAYER_ACTIVATED(" .. tostring(eventCode) .. ", "..tostring(initial) .. ", zoneId: "..tostring(zoneId) .. ", zoneIndex: "..tostring(zoneIndex) .. ")", debug)
     addon.ZoneGuideTracker:ClearActiveWorldEventInstance()
-    addon.BossFight:UpdateBossNames()
+    addon.BossFight:UpdateBossList()
     addon.ZoneGuideTracker:InitializeZone(zoneIndex)
     
     -- If running before Update 33 comes out, then back up all current progress when you first log in.
@@ -114,9 +111,29 @@ function Events:ReticleTargetChanged(eventCode)
         return
     end
     
+    local caption GetUnitCaption(unitTag)
+    local effectiveLevel = GetUnitEffectiveLevel(unitTag)
+    local relativeEquipmentBonusRating = GetUnitEquipmentBonusRatingRelativeToLevel(unitTag, 100)
+    local level = GetUnitLevel(unitTag)
+    local _, maxHealth = GetUnitPower(unitTag, POWERTYPE_HEALTH)
+    local _, maxHealthBonus = GetUnitPower(unitTag, POWERTYPE_HEALTH_BONUS)
+    local title = GetUnitTitle(unitTag)
+    local xp = GetUnitXP(unitTag)
+    local maxXP = GetUnitXPMax(unitTag)
+    
     local unitName = GetUnitName(unitTag) 
     addon.ZoneGuideTracker:RegisterDelveBossName(unitName)
-    addon.Utility.Debug("EVENT_RETICLE_TARGET_CHANGED(" .. tostring(eventCode) .. ", unitName: "..tostring(unitName) .. ")", debug)
+    addon.Utility.Debug("EVENT_RETICLE_TARGET_CHANGED(" .. tostring(eventCode) .. ", unitName: "..tostring(unitName) .. ", caption: "..tostring(caption) .. ", effectiveLevel: "..tostring(effectiveLevel) .. ", relativeEquipmentBonusRating: "..tostring(relativeEquipmentBonusRating) .. ", level: "..tostring(level) .. ", maxHealth: "..tostring(maxHealth) .. ", maxHealthBonus: "..tostring(maxHealthBonus) .. ", title: "..tostring(title) .. ", xp: "..tostring(xp) .. ", maxXP: "..tostring(maxXP) .. ")", debug)
+end
+
+--[[  ]]
+function Events:UnitDeathStateChanged (eventCode, unitTag, isDead)
+    if not isDead then
+        return
+    end
+    if addon.ZoneGuideTracker:TryRegisterWorldBossKill(unitTag) then
+        addon.Utility.Debug("EVENT_UNIT_DEATH_STATE_CHANGED(" .. tostring(eventCode) .. ", "..tostring(unitTag) .. ", "..tostring(isDead) .. ")", debug)
+    end
 end
 
 --[[  ]]
