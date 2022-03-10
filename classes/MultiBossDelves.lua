@@ -33,11 +33,11 @@ end
 function MultiBossDelves:AreAllBossesKilled(zoneId)
     local bossNames = self:GetBossList(zoneId)
     if not bossNames then
-        return
+        return false
     end
     for bossIndex = 1, #bossNames do
         if not addon.Data:GetIsMultiBossDelveBossKilled(zoneId, bossIndex) then
-            return
+            return false
         end
     end
     return true
@@ -57,7 +57,6 @@ function MultiBossDelves:GetBossList(zoneId)
 end
 
 function MultiBossDelves:RegisterBossKill(zoneId, targetName)
-    targetName = zo_strformat("<<1>>", targetName)
     local bossNames = self:GetBossList(zoneId)
     if not bossNames then
         return
@@ -122,6 +121,21 @@ MULTIBOSS_DELVE_DATA = {
         }
     },
     
+    [505] = 
+    {
+        ["zoneId"] = 505,
+        ["parentZoneId"] = 181,
+        ["activityIndex"] = 6,
+        ["name"] = "Red Ruby Cave",
+        ["poiId"] = 630,
+        ["bossNames"] = {
+            ["en"] = {
+                "Endare",
+                "Zandur"
+            }
+        }
+    },
+    
     [502] = {
         ["zoneId"] = 502,
         ["parentZoneId"] = 181,
@@ -135,6 +149,21 @@ MULTIBOSS_DELVE_DATA = {
             }
         }
     },
+    
+    -- Underpall Cave, Cyrodiil
+    [533] = {
+        ["zoneId"] = 533,
+        ["parentZoneId"] = 181,
+        ["activityIndex"] = 17,
+        ["name"] = "Underpall Cave",
+        ["poiId"] = 510,
+        ["bossNames"] = {
+            ["en"] = {
+                "Raelynne Ashham",
+                "Emelin the Returned"
+            }
+        }
+    }
 }
 
 

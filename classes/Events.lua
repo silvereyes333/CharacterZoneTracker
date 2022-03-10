@@ -6,6 +6,7 @@
   
 local addon = CharacterZonesAndBosses
 local debug = true
+local HANDLER_CONFIG
 
 -- Singleton class
 local Events = ZO_Object:Subclass()
@@ -14,32 +15,18 @@ function Events:New()
     return ZO_Object.New(self)
 end
 
-function Events:Initialize()
-  
-    self.handlerNames = {
-        [EVENT_BOSSES_CHANGED]                      = "BossesChanged",
-        [EVENT_COMBAT_EVENT]                        = "CombatEvent",
-        [EVENT_PLAYER_ACTIVATED]                    = "PlayerActivated",
-        [EVENT_RETICLE_TARGET_CHANGED]              = "ReticleTargetChanged",
-        [EVENT_WORLD_EVENT_ACTIVATED]               = "WorldEventActivated",
-        [EVENT_WORLD_EVENT_ACTIVE_LOCATION_CHANGED] = "WorldEventActiveLocationChanged",
-        [EVENT_WORLD_EVENT_DEACTIVATED]             = "WorldEventDeactivated",
-        [EVENT_ZONE_CHANGED]                        = "ZoneChanged",
-        [EVENT_ZONE_UPDATE]                         = "ZoneUpdate",
-        [EVENT_UNIT_DEATH_STATE_CHANGED]            = "UnitDeathStateChanged",
-    }
-    
-    for event, handlerName in pairs(self.handlerNames) do
-        EVENT_MANAGER:RegisterForEvent(addon.name .. handlerName, event, self:Closure(handlerName))
+function Events:Initialize()    
+    for handlerIndex = 1, #HANDLER_CONFIG do
+        local handler = HANDLER_CONFIG[handlerIndex]
+        EVENT_MANAGER:RegisterForEvent(addon.name .. handler.name, handler.event, self:Closure(handler.name))
+        if handler.filters then
+            for filterIndex = 1, #handler.filters do
+                local filterType = handler.filters[filterIndex][1]
+                local filterValue = handler.filters[filterIndex][2]
+                EVENT_MANAGER:AddFilterForEvent(addon.name .. handler.name, handler.event, filterType, filterValue)
+            end
+        end
     end
-    
-    EVENT_MANAGER:AddFilterForEvent(addon.name .. "CombatEvent", EVENT_COMBAT_EVENT, REGISTER_FILTER_COMBAT_RESULT, ACTION_RESULT_TARGET_DEAD)
-    EVENT_MANAGER:AddFilterForEvent(addon.name .. "CombatEvent", EVENT_COMBAT_EVENT, REGISTER_FILTER_TARGET_COMBAT_UNIT_TYPE, COMBAT_UNIT_TYPE_NONE)
-    EVENT_MANAGER:RegisterForEvent(addon.name .. "CombatEvent2", EVENT_COMBAT_EVENT, self:Closure("CombatEvent"))
-    EVENT_MANAGER:AddFilterForEvent(addon.name .. "CombatEvent2", EVENT_COMBAT_EVENT, REGISTER_FILTER_COMBAT_RESULT, ACTION_RESULT_DIED_XP)
-    EVENT_MANAGER:AddFilterForEvent(addon.name .. "CombatEvent2", EVENT_COMBAT_EVENT, REGISTER_FILTER_TARGET_COMBAT_UNIT_TYPE, COMBAT_UNIT_TYPE_NONE)
-    EVENT_MANAGER:AddFilterForEvent(addon.name .. "UnitDeathStateChanged", EVENT_UNIT_DEATH_STATE_CHANGED, REGISTER_FILTER_UNIT_TAG_PREFIX, "boss")
-    EVENT_MANAGER:AddFilterForEvent(addon.name .. "ZoneUpdate", EVENT_ZONE_UPDATE, REGISTER_FILTER_UNIT_TAG, "player")
 end
 
 
@@ -56,25 +43,32 @@ function Events:BossesChanged(eventCode, forceReset)
     end
 end
 
+--[[  ]]
+function Events:BossUnitDeathStateChanged (eventCode, unitTag, isDead)
+    if not isDead then
+        return
+    end
+    
+    addon.Utility.Debug("EVENT_UNIT_DEATH_STATE_CHANGED(" .. tostring(eventCode) .. ", "..tostring(unitTag) .. ", "..tostring(isDead) .. ")", debug)
+    
+    if IsUnitInDungeon("player") then
+        addon.ZoneGuideTracker:TryRegisterDelveBossKill(unitTag)
+    else
+        addon.ZoneGuideTracker:TryRegisterWorldBossKill(unitTag)
+    end
+end
+
 function Events:Closure(functionName)
     return function(...)
         self[functionName](self, ...)
     end
 end
 
---[[  ]]
-function Events:CombatEvent(eventCode, result, isError, abilityName, abilityGraphic, abilityActionSlotType, sourceName, sourceType, targetName, targetType, hitValue, powerType, damageType, log, sourceUnitId, targetUnitId, abilityId, overflow)
-    
-    if not targetName or targetName == "" then
-        return
-    end
-  
-    local success = addon.ZoneGuideTracker:TryRegisterDelveBossKill(targetName)
-    if success then
-        addon.Utility.Debug("EVENT_COMBAT_EVENT(" .. tostring(eventCode) .. ", result: "..tostring(result) .. ", isError: "..tostring(isError) 
-            .. ", sourceName: "..tostring(sourceName) .. ", sourceType: " .. tostring(sourceType) .. ", targetName: "..tostring(targetName) .. ", targetType: "..tostring(targetType) 
-            .. ", source: "..tostring(sourceUnitId) .. ", target: "..tostring(targetUnitId) .. ")", debug)
-    end
+function Events:CombatEventDiedXP(eventCode, result, isError, abilityName, abilityGraphic, abilityActionSlotType, sourceName, sourceType, targetName, targetType, hitValue, powerType, damageType, log, sourceUnitId, targetUnitId, abilityId, overflow)
+      addon.Utility.Debug("EVENT_COMBAT_EVENT(" .. tostring(eventCode) .. ", result: "..tostring(result) .. ", isError: "..tostring(isError) 
+        .. ", sourceName: "..tostring(sourceName) .. ", sourceType: " .. tostring(sourceType) .. ", targetName: "..tostring(targetName) .. ", targetType: "..tostring(targetType) 
+        .. ", source: "..tostring(sourceUnitId) .. ", target: "..tostring(targetUnitId) .. ")", debug)
+      addon.ZoneGuideTracker:TryRegisterDelveBossKill(nil, targetName)
 end
 
 --[[  ]]
@@ -83,6 +77,7 @@ function Events:PlayerActivated(eventCode, initial)
     local zoneId = GetZoneId(zoneIndex)
     addon.Utility.Debug("EVENT_PLAYER_ACTIVATED(" .. tostring(eventCode) .. ", "..tostring(initial) .. ", zoneId: "..tostring(zoneId) .. ", zoneIndex: "..tostring(zoneIndex) .. ")", debug)
     addon.ZoneGuideTracker:ClearActiveWorldEventInstance()
+    addon.ZoneGuideTracker:ResetDangerousMonsterNames()
     addon.BossFight:UpdateBossList()
     addon.ZoneGuideTracker:InitializeZone(zoneIndex)
     
@@ -92,12 +87,27 @@ function Events:PlayerActivated(eventCode, initial)
     end
 end
 
+--[[  ]]
+function Events:ReticleoverUnitDeathStateChanged(eventCode, unitTag, isDead)
+    if not isDead then
+        return
+    end
+    
+    addon.Utility.Debug("EVENT_UNIT_DEATH_STATE_CHANGED(" .. tostring(eventCode) .. ", unitTag: "..tostring(unitTag) .. ", unitName: "..tostring(GetUnitName(unitTag)) .. ", isDead: "..tostring(isDead) .. ")", debug)
+    addon.ZoneGuideTracker:TryRegisterDelveBossKill(unitTag)
+end
+
 function Events:ReticleTargetChanged(eventCode)
     -- If in the overland, we're obviously not in a delve.
     if not IsUnitInDungeon("player") then
         return
     end
+    
     local unitTag = "reticleover"
+    local unitName = GetUnitName(unitTag)
+    if not unitName or unitName == "" then
+        return
+    end
     
     -- Ignore trash mobs
     local difficulty = GetUnitDifficulty(unitTag)
@@ -107,33 +117,12 @@ function Events:ReticleTargetChanged(eventCode)
     
     -- Non-hostile units are not delve bosses
     local unitReaction = GetUnitReaction(unitTag)
+    addon.Utility.Debug("EVENT_RETICLE_TARGET_CHANGED(" .. tostring(eventCode) .. ", unitName: "..tostring(unitName) .. ", difficulty: " .. tostring(difficulty)  .. ", unitReaction: " .. tostring(unitReaction) .. ")", debug)
     if unitReaction ~= UNIT_REACTION_HOSTILE then
         return
     end
     
-    local caption GetUnitCaption(unitTag)
-    local effectiveLevel = GetUnitEffectiveLevel(unitTag)
-    local relativeEquipmentBonusRating = GetUnitEquipmentBonusRatingRelativeToLevel(unitTag, 100)
-    local level = GetUnitLevel(unitTag)
-    local _, maxHealth = GetUnitPower(unitTag, POWERTYPE_HEALTH)
-    local _, maxHealthBonus = GetUnitPower(unitTag, POWERTYPE_HEALTH_BONUS)
-    local title = GetUnitTitle(unitTag)
-    local xp = GetUnitXP(unitTag)
-    local maxXP = GetUnitXPMax(unitTag)
-    
-    local unitName = GetUnitName(unitTag) 
-    addon.ZoneGuideTracker:RegisterDelveBossName(unitName)
-    addon.Utility.Debug("EVENT_RETICLE_TARGET_CHANGED(" .. tostring(eventCode) .. ", unitName: "..tostring(unitName) .. ", caption: "..tostring(caption) .. ", effectiveLevel: "..tostring(effectiveLevel) .. ", relativeEquipmentBonusRating: "..tostring(relativeEquipmentBonusRating) .. ", level: "..tostring(level) .. ", maxHealth: "..tostring(maxHealth) .. ", maxHealthBonus: "..tostring(maxHealthBonus) .. ", title: "..tostring(title) .. ", xp: "..tostring(xp) .. ", maxXP: "..tostring(maxXP) .. ")", debug)
-end
-
---[[  ]]
-function Events:UnitDeathStateChanged (eventCode, unitTag, isDead)
-    if not isDead then
-        return
-    end
-    if addon.ZoneGuideTracker:TryRegisterWorldBossKill(unitTag) then
-        addon.Utility.Debug("EVENT_UNIT_DEATH_STATE_CHANGED(" .. tostring(eventCode) .. ", "..tostring(unitTag) .. ", "..tostring(isDead) .. ")", debug)
-    end
+    addon.ZoneGuideTracker:RegisterDangerousMonsterName(unitName, difficulty)
 end
 
 --[[  ]]
@@ -173,6 +162,74 @@ function Events:ZoneUpdate(eventCode, unitTag, newZoneName)
     addon.Utility.Debug("EVENT_ZONE_UPDATE(" .. tostring(newZoneName) .. ", zoneId: "..tostring(zoneId) .. ", zoneIndex: "..tostring(zoneIndex) .. ")", debug)
     addon.ZoneGuideTracker:InitializeZone(zoneIndex)
 end
+
+
+---------------------------------------
+--
+--          Private Members
+-- 
+---------------------------------------
+
+HANDLER_CONFIG = {
+    {
+        name = "BossesChanged",
+        event = EVENT_BOSSES_CHANGED,
+    },
+    {
+        name = "BossUnitDeathStateChanged",
+        event = EVENT_UNIT_DEATH_STATE_CHANGED,
+        filters = {
+            { REGISTER_FILTER_UNIT_TAG_PREFIX, "boss" }
+        },
+    },
+    {
+        name = "CombatEventDiedXP",
+        event = EVENT_COMBAT_EVENT,
+        filters = {
+            { REGISTER_FILTER_COMBAT_RESULT, ACTION_RESULT_DIED_XP }
+        },
+    },
+    {
+        name = "PlayerActivated",
+        event = EVENT_PLAYER_ACTIVATED,
+    },
+    {
+        name = "ReticleoverUnitDeathStateChanged",
+        event = EVENT_UNIT_DEATH_STATE_CHANGED,
+        filters = {
+            { REGISTER_FILTER_UNIT_TAG, "reticleover" }
+        },
+    },
+    {
+        name = "ReticleTargetChanged",
+        event = EVENT_RETICLE_TARGET_CHANGED,
+    },
+    {
+        name = "WorldEventActivated",
+        event = EVENT_WORLD_EVENT_ACTIVATED,
+    },
+    {
+        name = "WorldEventActiveLocationChanged",
+        event = EVENT_WORLD_EVENT_ACTIVE_LOCATION_CHANGED,
+    },
+    {
+        name = "WorldEventDeactivated",
+        event = EVENT_WORLD_EVENT_DEACTIVATED,
+    },
+    {
+        name = "ZoneChanged",
+        event = EVENT_ZONE_CHANGED,
+    },
+    {
+        name = "ZoneUpdate",
+        event = EVENT_ZONE_UPDATE,
+        filters = {
+            { REGISTER_FILTER_UNIT_TAG, "player" }
+        },
+    },
+}
+
+
 
 -- Create singleton
 addon.Events = Events:New()

@@ -4,9 +4,10 @@
 local addon = CharacterZonesAndBosses
 local COMPLETION_TYPES = addon:GetCompletionTypes()
 local ZONE_ACTIVITY_NAME_MAX_LEVENSHTEIN_DISTANCE = 5
+local FIRST_ZONE_ID_WITH_DELVE_BOSS_UNIT_TAGS = 589
 local ZoneGuideTracker = ZO_Object:Subclass()
 
-local name = addon.name .. "ZoneGuideTracker"
+local className = addon.name .. "ZoneGuideTracker"
 local debug = true
 local isPlayerNearObjective, matchObjectiveName, matchPoiIndex
 
@@ -24,12 +25,11 @@ function ZoneGuideTracker:New(...)
 end
 
 function ZoneGuideTracker:Initialize()
-    self.name = name
+    self.name = className
     self.pointsOfInterest = {}
     self.objectives = {}
-    self.achievements = {}
+    self.dangerousMonsterNames = {}
     self.delves = {}
-    self.delveBossNames = {}
 end
 
 
@@ -187,11 +187,15 @@ function ZoneGuideTracker:InitializeZone(zoneIndex)
     local parentZoneId = GetParentZoneId(zoneId)
     
     local mapIndex = GetMapIndexByZoneId(zoneId)
-    local _, mapType, mapContentType = GetMapInfo(mapIndex)
     
     if parentZoneId and parentZoneId > 0 and parentZoneId ~= zoneId then
         local parentZoneIndex = GetZoneIndex(parentZoneId)
-        local delve = { zoneId = zoneId, zoneIndex = zoneIndex, name = GetZoneNameById(zoneId), parentZoneIndex = parentZoneIndex, mapType = mapType, mapContentType = mapContentType }
+        local delve = {
+            zoneId          = zoneId,
+            zoneIndex       = zoneIndex,
+            name            = GetZoneNameById(zoneId),
+            parentZoneIndex = parentZoneIndex
+        }
         self:InitializeZone(parentZoneIndex)
         if not self.objectives[parentZoneIndex] or not self.objectives[parentZoneIndex][ZONE_COMPLETION_TYPE_DELVES] then
             return true
@@ -236,7 +240,12 @@ function ZoneGuideTracker:InitializeZone(zoneIndex)
             totalActivityCount = totalActivityCount + activityCount
             self.objectives[zoneIndex][completionType] = {}
             for activityIndex = 1, GetNumZoneActivitiesForZoneCompletionType(zoneId, completionType) do
-                local objective = { name = GetZoneStoryActivityNameByActivityIndex(zoneId, completionType, activityIndex), zoneIndex = zoneIndex, activityIndex = activityIndex, poiId = GetZoneActivityIdForZoneCompletionType(zoneId, completionType, activityIndex) }
+                local objective = {
+                    name          = GetZoneStoryActivityNameByActivityIndex(zoneId, completionType, activityIndex),
+                    zoneIndex     = zoneIndex,
+                    activityIndex = activityIndex,
+                    poiId         = GetZoneActivityIdForZoneCompletionType(zoneId, completionType, activityIndex),
+                }
                 local _, poiIndex = GetPOIIndices(objective.poiId)
                 objective.poiIndex = self.pointsOfInterest[zoneIndex][objective.name]
                 objective.lookedUpPOIIndex = poiIndex
@@ -275,9 +284,12 @@ function ZoneGuideTracker:LoadBaseGameCompletionForCurrentZone()
     self:UpdateUI()
 end
 
-function ZoneGuideTracker:RegisterDelveBossName(targetName)
-    targetName = zo_strformat("<<1>>", targetName)
-    self.delveBossNames[targetName] = true
+function ZoneGuideTracker:RegisterDangerousMonsterName(name, difficulty)
+    self.dangerousMonsterNames[name] = difficulty
+end
+
+function ZoneGuideTracker:ResetDangerousMonsterNames()
+    ZO_ClearTable(self.dangerousMonsterNames)
 end
 
 function ZoneGuideTracker:ResetCurrentZone()
@@ -308,32 +320,96 @@ function ZoneGuideTracker:SetActiveWorldEventInstanceId(worldEventInstanceId)
     }
 end
 
-function ZoneGuideTracker:TryRegisterDelveBossKill(targetName)
-    targetName = zo_strformat("<<1>>", targetName)
+function ZoneGuideTracker:TryRegisterDelveBossKill(unitTag, targetName)
+  
+    local difficulty
+    local unitReaction
+    if unitTag and unitTag ~= "" then
+        difficulty = GetUnitDifficulty(unitTag)
+        unitReaction = GetUnitReaction(unitTag)
+    else
+        if not targetName or targetName == "" then
+            return
+        end
+        targetName = zo_strformat("<<1>>", targetName)
+        difficulty = self.dangerousMonsterNames[targetName]
+        if not difficulty then
+            addon.Utility.Debug("Target " .. tostring(targetName) .. " is not a known dangerous monster.", debug)
+            return
+        end
+        unitReaction = UNIT_REACTION_HOSTILE
+        unitTag = "reticleover"
+    end
     
+    -- Bosses are always at least "normal" (purple, winged unit frame) difficulty.
+    if difficulty < MONSTER_DIFFICULTY_NORMAL then
+        addon.Utility.Debug("Kill for target " .. tostring(unitTag) .. " ignored because monster difficulty is only " .. tostring(difficulty), debug)
+        return
+    end    
+    
+    -- Non-hostile units are not delve bosses
+    if unitReaction ~= UNIT_REACTION_HOSTILE then
+        return
+    end
+    
+    -- Get current zone and confirm that it is valid
     local zoneIndex = GetCurrentMapZoneIndex()
-    if not zoneIndex then
+    if not zoneIndex or zoneIndex == 0 then
+        addon.Utility.Debug("Zone index " .. tostring(zoneIndex) .. " is not valid", debug)
         return
     end
-    local delve = self.delves[zoneIndex]
-    if not delve or not IsUnitInDungeon("player") then
+    local zoneId = GetZoneId(zoneIndex)
+    if not zoneId or zoneId == 0 then
+        addon.Utility.Debug("Zone id " .. tostring(zoneId) .. " is not valid", debug)
         return
     end
     
-    local zoneId = GetZoneId(zoneIndex)
-    if addon.MultiBossDelves:IsZoneMultiBossDelve(zoneId) then
-        addon.MultiBossDelves:RegisterBossKill(zoneId, targetName)
-        if not addon.MultiBossDelves:AreAllBossesKilled(zoneId) then
-            addon.Utility.Debug("Not all bosses in "..tostring(delve.name) .. ", zone id: " .. delve.zoneId .. " are killed yet.", debug)
+    -- Ensure that the player is in a delve zone index.
+    local delve = self.delves[zoneIndex]
+    if not delve then 
+        addon.Utility.Debug("Could not find delve for zone name " .. tostring(GetZoneNameById(zoneId)), debug)
+        return
+    end
+    
+    if not IsUnitInDungeon("player") then
+        addon.Utility.Debug("Player is not in dungeon. Not registering delve kill.", debug)
+        return
+    end
+    
+     -- If zone is newer than Clockwork City, use BossFight to detect boss kills.
+    local parentZoneId = GetZoneId(delve.parentZoneIndex)
+    if parentZoneId >= FIRST_ZONE_ID_WITH_DELVE_BOSS_UNIT_TAGS then
+    
+        if not addon.BossFight:RegisterKill(unitTag) then
+            addon.Utility.Debug("Boss " .. tostring(unitTag) .. " is not a known boss.", debug)
             return
         end
         
-    elseif not targetName or not self.delveBossNames[targetName] then
-        addon.Utility.Debug("Not registering delve kill for "..tostring(delve.name) .. ", zone id: " .. delve.zoneId .. " because target name " .. tostring(targetName) .. " is not found in the known delve boss names list.", debug)
-        return
+        if not addon.BossFight:AreAllBossesKilled() then
+            addon.Utility.Debug("Kill for boss " .. tostring(unitTag) .. " registered, but there are more bosses waiting to be killed for this world boss fight.", debug)
+            return
+        end
+    else
+        if not targetName or targetName == "" then
+            targetName = zo_strformat("<<1>>", GetUnitName(unitTag))
+        end
+        
+        -- Exclude certain difficult monsters by name that are known to not be bosses.
+        if addon.ExcludedMonsters:IsExcludedMonster(targetName) then
+            addon.Utility.Debug(targetName .. " is specifically excluded. Not registering delve kill.", debug)
+            return
+        end
+        
+        -- Certain delves in Craglorn and Cyrodiil require killing several bosses to get credit.
+        if addon.MultiBossDelves:IsZoneMultiBossDelve(zoneId) then
+            addon.MultiBossDelves:RegisterBossKill(zoneId, targetName)
+            if not addon.MultiBossDelves:AreAllBossesKilled(zoneId) then
+                addon.Utility.Debug("Not all bosses in "..tostring(delve.name) .. ", zone id: " .. delve.zoneId .. " are killed yet.", debug)
+                return
+            end
+        end
     end
     
-    local parentZoneId = GetZoneId(delve.parentZoneIndex)
     addon.Utility.Debug("Setting delve "..tostring(delve.name) .. ", zone id: " .. delve.zoneId .. " as complete.", debug)
     if addon.Data:SetActivityComplete(parentZoneId, ZONE_COMPLETION_TYPE_DELVES, delve.objective.activityIndex, true) then
         -- Announce it was complete and refresh UI

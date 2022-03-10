@@ -17,6 +17,7 @@ classes/BossFight.lua
 classes/Compass.lua
 classes/Data.lua
 classes/Events.lua
+classes/ExcludedMonsters.lua
 classes/MultiBossDelves.lua
 classes/Utility.lua
 classes/WorldMap.lua
