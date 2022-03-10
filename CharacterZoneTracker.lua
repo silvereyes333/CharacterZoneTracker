@@ -1,15 +1,16 @@
--- Character Zone and Boss Completion Addon for Elder Scrolls Online
+-- Character Zone Tracker Addon for Elder Scrolls Online
 -- Author: silvereyes
 
-CharacterZonesAndBosses = {
-    name = "CharacterZonesAndBosses",
+CharacterZoneTracker = {
+    name = "CharacterZoneTracker",
     title = "Character Zone and Boss Completion",
     version = "1.0.0",
     author = "silvereyes",
+    debugMode = false,
 }
 
 -- Local declarations
-local addon = CharacterZonesAndBosses
+local addon = CharacterZoneTracker
 local onAddonLoaded
 local COMPLETION_TYPES
 
@@ -21,23 +22,25 @@ local COMPLETION_TYPES
 -- 
 ---------------------------------------
 
-addon.Chat = LibChatMessage(addon.name, "CZB")
+if LibChatMessage then
+    addon.Chat = LibChatMessage(addon.name, "CZT")
+end
 
-function CharacterZonesAndBosses_OnKeyboardLoadAccountButtonClick(control)
+function CharacterZoneTracker_OnKeyboardLoadAccountButtonClick(control)
     local worldMap = addon.WorldMap -- get singleton
     worldMap:OnKeyboardLoadAccountButtonClick(control)
 end
 
-function CharacterZonesAndBosses_OnKeyboardResetButtonClick(control)
+function CharacterZoneTracker_OnKeyboardResetButtonClick(control)
     local worldMap = addon.WorldMap -- get singleton
     worldMap:OnKeyboardResetButtonClick(control)
 end
 
-function CharacterZonesAndBosses:GetCompletionTypes()
+function CharacterZoneTracker:GetCompletionTypes()
     return COMPLETION_TYPES
 end
 
-function CharacterZonesAndBosses:IsCompletionTypeTracked(completionType)
+function CharacterZoneTracker:IsCompletionTypeTracked(completionType)
     return COMPLETION_TYPES[completionType]
 end
 
@@ -64,7 +67,7 @@ function onAddonLoaded(event, name)
 end
 
 COMPLETION_TYPES = {
-    [ZONE_COMPLETION_TYPE_DELVES] = true, -- IsUnitInDungeon("player") == true
+    [ZONE_COMPLETION_TYPE_DELVES] = true,
     [ZONE_COMPLETION_TYPE_GROUP_BOSSES] = true,
     [ZONE_COMPLETION_TYPE_WORLD_EVENTS] = true,
 }

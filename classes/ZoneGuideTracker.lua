@@ -1,14 +1,14 @@
 --[[ 
 ]]--
 
-local addon = CharacterZonesAndBosses
+local addon = CharacterZoneTracker
 local COMPLETION_TYPES = addon:GetCompletionTypes()
 local ZONE_ACTIVITY_NAME_MAX_LEVENSHTEIN_DISTANCE = 5
 local FIRST_ZONE_ID_WITH_DELVE_BOSS_UNIT_TAGS = 589
 local ZoneGuideTracker = ZO_Object:Subclass()
 
 local className = addon.name .. "ZoneGuideTracker"
-local debug = true
+local debug = false
 local isPlayerNearObjective, matchObjectiveName, matchPoiIndex
 
 
@@ -78,9 +78,9 @@ function ZoneGuideTracker:DeactivateWorldEventInstance()
     ZO_ClearTable(self.activeWorldEvent)
     self.activeWorldEvent = nil
     local zoneId = GetZoneId(worldEventObjective.zoneIndex)
-    addon.Utility.Debug("Setting world event  "..tostring(worldEventObjective.name) .. ", zone id: " .. tostring(zoneId) .. ", activityIndex: " .. tostring(worldEventObjective.activityIndex) .. " as complete.", debug)
     
     local completedBefore = addon.Data:IsActivityCompletedOnAccount(zoneId, ZONE_COMPLETION_TYPE_WORLD_EVENTS, worldEventObjective.activityIndex)
+    addon.Utility.Debug("Setting world event  "..tostring(worldEventObjective.name) .. ", zone id: " .. tostring(zoneId) .. ", activityIndex: " .. tostring(worldEventObjective.activityIndex) .. ", completedBefore: " .. tostring(completedBefore) .. " as complete.", debug)
     if addon.Data:SetActivityComplete(zoneId, ZONE_COMPLETION_TYPE_WORLD_EVENTS, worldEventObjective.activityIndex, true) then
         -- Refresh UI, and announce if not the first time
         if completedBefore then
@@ -286,7 +286,7 @@ end
 
 function ZoneGuideTracker:LoadBaseGameCompletionForCurrentZone()
     local zoneIndex = GetCurrentMapZoneIndex()
-    self.Data:LoadBaseGameCompletion(zoneIndex)
+    addon.Data:LoadBaseGameCompletionForZone(zoneIndex)
     self:UpdateUI()
 end
 

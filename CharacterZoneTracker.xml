@@ -2,18 +2,18 @@
     <Controls>
         <TopLevelControl name="ZO_WorldMapZoneStoryTopLevel_Keyboard" override="true">
             <Controls>
-                <Button name="CharacterZonesAndBosses_KeyboardResetButton" inherits="ZO_DefaultButton" text="SI_CZB_RESET_ACTION" hidden="true">
+                <Button name="CharacterZoneTracker_KeyboardResetButton" inherits="ZO_DefaultButton" text="SI_CZB_RESET_ACTION" hidden="true">
                     <Dimensions x="250" />
                     <Anchor point="CENTER" relativeTo="$(parent)List" relativePoint="BOTTOM" offsetX="-16" offsetY="70" />
                     <OnClicked>
-                        CharacterZonesAndBosses_OnKeyboardResetButtonClick(self)
+                        CharacterZoneTracker_OnKeyboardResetButtonClick(self)
                     </OnClicked>
                 </Button>
-                <Button name="CharacterZonesAndBosses_KeyboardLoadAccountButton" inherits="ZO_DefaultButton" text="SI_CZB_LOAD_ACCOUNT_ACTION" hidden="true">
+                <Button name="CharacterZoneTracker_KeyboardLoadAccountButton" inherits="ZO_DefaultButton" text="SI_CZB_LOAD_ACCOUNT_ACTION" hidden="true">
                     <Dimensions x="200" />
                     <Anchor point="CENTER" relativeTo="$(parent)List" relativePoint="BOTTOM" offsetX="-16" offsetY="105" />
                     <OnClicked>
-                        CharacterZonesAndBosses_OnKeyboardLoadAccountButtonClick(self)
+                        CharacterZoneTracker_OnKeyboardLoadAccountButtonClick(self)
                     </OnClicked>
                 </Button>
             </Controls>

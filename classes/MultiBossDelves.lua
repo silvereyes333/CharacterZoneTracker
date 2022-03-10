@@ -4,7 +4,7 @@
     ============================================
   ]]
   
-local addon = CharacterZonesAndBosses
+local addon = CharacterZoneTracker
 local debug = false
 local MULTIBOSS_DELVE_DATA
 

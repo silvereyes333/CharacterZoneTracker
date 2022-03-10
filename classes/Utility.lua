@@ -4,20 +4,18 @@
     ===================================
   ]]
   
-local addon = CharacterZonesAndBosses
+local addon = CharacterZoneTracker
 local debug = false
-local logger = LibDebugLogger(addon.name)
 
 -- STATIC CLASS
 addon.Utility = ZO_Object:Subclass()
 
 --[[ Outputs formatted message to chat window if debugging is turned on ]]
-function addon.Utility.Debug(input, force)
-    --logger:Debug(input)
+function addon.Utility.Debug(output, force)
     if not force and not addon.debugMode then
         return
     end
-    d("[CZB] " .. input)
+    addon.Utility.Print(output)
 end
 
 function addon.Utility.CartesianDistance2D(x1, y1, x2, y2)
@@ -72,5 +70,9 @@ end
 
 --[[ Outputs formatted message to chat window ]]
 function addon.Utility.Print(output)
-    addon.Utility.chat:Print(output)
+    if addon.Chat then
+        addon.Chat:Print(output)
+    else
+        d(output)
+    end
 end

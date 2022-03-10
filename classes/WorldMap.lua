@@ -4,8 +4,8 @@
     ===================================
   ]]
   
-local addon = CharacterZonesAndBosses
-local debug = true
+local addon = CharacterZoneTracker
+local debug = false
 local CBZ_DIALOG_NAME_CONFIRM_ZONE_RESET = addon.name .. "_ConfirmZoneReset"
 local CBZ_DIALOG_NAME_CONFIRM_LOAD_ACCOUNT = addon.name .. "_ConfirmLoadAccount"
 local COLOR_NORMAL = ZO_ColorDef:New(GetInterfaceColor(INTERFACE_COLOR_TYPE_TEXT_COLORS, INTERFACE_TEXT_COLOR_NORMAL))
@@ -111,7 +111,7 @@ function WorldMap:Initialize()
     }
     
     -- Show the reset button
-    CharacterZonesAndBosses_KeyboardResetButton:SetHidden(false)
+    CharacterZoneTracker_KeyboardResetButton:SetHidden(false)
     
     -- Map completion load account button dialog
     ESO_Dialogs[CBZ_DIALOG_NAME_CONFIRM_LOAD_ACCOUNT] =
@@ -137,7 +137,7 @@ function WorldMap:Initialize()
     }
     
     -- Show the load account button
-    CharacterZonesAndBosses_KeyboardLoadAccountButton:SetHidden(false)
+    CharacterZoneTracker_KeyboardLoadAccountButton:SetHidden(false)
 end
 
 

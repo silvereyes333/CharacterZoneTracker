@@ -4,8 +4,8 @@
     ===============================================================
   ]]
   
-local addon = CharacterZonesAndBosses
-local debug = true
+local addon = CharacterZoneTracker
+local debug = false
 local EXCLUDED_MONSTER_NAMES
 
 -- Singleton class

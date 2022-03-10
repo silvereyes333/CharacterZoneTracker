@@ -4,8 +4,8 @@
     ===================================
   ]]
   
-local addon = CharacterZonesAndBosses
-local debug = true
+local addon = CharacterZoneTracker
+local debug = false
 local HANDLER_CONFIG
 
 -- Singleton class
@@ -60,7 +60,7 @@ end
 
 function Events:Closure(functionName)
     return function(...)
-        self[functionName](self, ...)
+        return self[functionName](self, ...)
     end
 end
 
@@ -76,7 +76,7 @@ function Events:PlayerActivated(eventCode, initial)
     local zoneIndex = GetCurrentMapZoneIndex()
     local zoneId = GetZoneId(zoneIndex)
     addon.Utility.Debug("EVENT_PLAYER_ACTIVATED(" .. tostring(eventCode) .. ", "..tostring(initial) .. ", zoneId: "..tostring(zoneId) .. ", zoneIndex: "..tostring(zoneIndex) .. ")", debug)
-    addon.ZoneGuideTracker:ClearActiveWorldEventInstance()
+    addon.ZoneGuideTracker:SetActiveWorldEventInstanceId(GetNextWorldEventInstanceId())
     addon.ZoneGuideTracker:ResetDangerousMonsterNames()
     addon.BossFight:UpdateBossList()
     addon.ZoneGuideTracker:InitializeZone(zoneIndex)

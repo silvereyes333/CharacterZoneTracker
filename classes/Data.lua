@@ -1,7 +1,8 @@
-local addon = CharacterZonesAndBosses
+local addon = CharacterZoneTracker
 local debug = false
 local ASYNC_TIMEOUT = 100
 local ASYNC_BACKUP_ALL_SCOPE = addon.name .. ".Data.BackupAllZonesAsync"
+local ASYNC_BACKUP_BATCH_SIZE = 500
 local COMPLETION_TYPES = addon:GetCompletionTypes()
 local save, trueCount, containsAnyUntrue
 
@@ -68,20 +69,18 @@ function Data:BackupAllZonesAsync(startZoneIndex)
     EVENT_MANAGER:UnregisterForUpdate(ASYNC_BACKUP_ALL_SCOPE)
     if not startZoneIndex then
         startZoneIndex = 1
-        -- Print backup start message to chat
-        addon.Chat:Print(zo_strformat(GetString(SI_CZB_BACKUP_START), GetUnitName("player")))
     end
-    for zoneIndex = startZoneIndex, startZoneIndex + 10 do
+    for zoneIndex = startZoneIndex, startZoneIndex + ASYNC_BACKUP_BATCH_SIZE do
         local zoneId = GetZoneId(zoneIndex)
         if not zoneId or zoneId < 1 then
             -- Print backup success message to chat
-            addon.Chat:Print(zo_strformat(GetString(SI_CZB_BACKUP_FINISHED), GetUnitName("player")))
+            addon.Utility.Print(zo_strformat(GetString(SI_CZB_BACKUP_FINISHED), GetUnitName("player")))
             self:SetIsBackedUp()
             return
         end
         self:LoadBaseGameCompletionForZone(zoneIndex)
     end
-    EVENT_MANAGER:RegisterForUpdate(ASYNC_BACKUP_ALL_SCOPE, ASYNC_TIMEOUT, self:GenerateBackupAllZonesAsyncCallback(startZoneIndex + 11))
+    EVENT_MANAGER:RegisterForUpdate(ASYNC_BACKUP_ALL_SCOPE, ASYNC_TIMEOUT, self:GenerateBackupAllZonesAsyncCallback(startZoneIndex + ASYNC_BACKUP_BATCH_SIZE + 1))
 end
 
 --[[  ]]

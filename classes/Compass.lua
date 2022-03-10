@@ -4,8 +4,8 @@
     ===================================
   ]]
   
-local addon = CharacterZonesAndBosses
-local debug = true
+local addon = CharacterZoneTracker
+local debug = false
 
 -- Singleton class
 local Compass = ZO_Object:Subclass()
