@@ -152,7 +152,12 @@ function Data:IsActivityComplete(zoneId, completionType, activityIndex)
         addon.Utility.Debug("Returning " .. tostring(self.save[zoneId] and self.save[zoneId][completionType] and self.save[zoneId][completionType][activityIndex]), debug)
         return self.save[zoneId] and self.save[zoneId][completionType] and self.save[zoneId][completionType][activityIndex] or false
     end
-    return self.esoui.IsZoneStoryActivityComplete(zoneId, completionType)
+    return self.esoui.IsZoneStoryActivityComplete(zoneId, completionType, activityIndex)
+end
+
+--[[  ]]
+function Data:IsActivityCompletedOnAccount(zoneId, completionType, activityIndex)
+    return self.esoui.IsZoneStoryActivityComplete(zoneId, completionType, activityIndex)
 end
 
 --[[  ]]

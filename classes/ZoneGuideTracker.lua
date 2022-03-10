@@ -79,9 +79,15 @@ function ZoneGuideTracker:DeactivateWorldEventInstance()
     self.activeWorldEvent = nil
     local zoneId = GetZoneId(worldEventObjective.zoneIndex)
     addon.Utility.Debug("Setting world event  "..tostring(worldEventObjective.name) .. ", zone id: " .. tostring(zoneId) .. ", activityIndex: " .. tostring(worldEventObjective.activityIndex) .. " as complete.", debug)
+    
+    local completedBefore = addon.Data:IsActivityCompletedOnAccount(zoneId, ZONE_COMPLETION_TYPE_WORLD_EVENTS, worldEventObjective.activityIndex)
     if addon.Data:SetActivityComplete(zoneId, ZONE_COMPLETION_TYPE_WORLD_EVENTS, worldEventObjective.activityIndex, true) then
-        -- Announce it was complete and refresh UI
-        self:UpdateUIAndAnnounce(worldEventObjective, true)
+        -- Refresh UI, and announce if not the first time
+        if completedBefore then
+            self:UpdateUIAndAnnounce(worldEventObjective, true)
+        else
+            self:UpdateUI()
+        end
     end
 end
 
@@ -411,9 +417,14 @@ function ZoneGuideTracker:TryRegisterDelveBossKill(unitTag, targetName)
     end
     
     addon.Utility.Debug("Setting delve "..tostring(delve.name) .. ", zone id: " .. delve.zoneId .. " as complete.", debug)
+    local completedBefore = addon.Data:IsActivityCompletedOnAccount(parentZoneId, ZONE_COMPLETION_TYPE_DELVES, delve.objective.activityIndex)
     if addon.Data:SetActivityComplete(parentZoneId, ZONE_COMPLETION_TYPE_DELVES, delve.objective.activityIndex, true) then
-        -- Announce it was complete and refresh UI
-        self:UpdateUIAndAnnounce(delve.objective, true)
+        -- Refresh UI, and announce if not first time
+        if completedBefore then
+            self:UpdateUIAndAnnounce(delve.objective, true)
+        else
+            self:UpdateUI()
+        end
     end
     return true
 end
@@ -451,9 +462,16 @@ function ZoneGuideTracker:TryRegisterWorldBossKill(unitTag)
     end
     
     addon.Utility.Debug("Setting world boss "..tostring(worldBossObjective.name) .. ", zone id: " .. tostring(zoneId) .. " as complete.", debug)
+    
+    local completedBefore = addon.Data:IsActivityCompletedOnAccount(zoneId, ZONE_COMPLETION_TYPE_GROUP_BOSSES, worldBossObjective.activityIndex)
     if addon.Data:SetActivityComplete(zoneId, ZONE_COMPLETION_TYPE_GROUP_BOSSES, worldBossObjective.activityIndex, true) then
-        -- Announce it was complete and refresh UI
-        self:UpdateUIAndAnnounce(worldBossObjective, true)
+        -- Refresh UI, and announce if not the first time
+        if completedBefore then
+            self:UpdateUIAndAnnounce(worldBossObjective, true)
+        else
+            self:UpdateUI()
+        end
+        
     else
         addon.Utility.Debug("Not announcing "..tostring(worldBossObjective.name) .. " as complete. Already completed on this character.", debug)
     end
