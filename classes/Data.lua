@@ -100,7 +100,7 @@ end
 
 --[[  ]]
 function Data:GetIsBackedUp()
-    return self.save.backedUp
+    return self.save.backedUpV2
 end
 
 function Data:GetIsMultiBossDelveBossKilled(zoneId, bossIndex)
@@ -187,7 +187,8 @@ end
 
 --[[  ]]
 function Data:SetIsBackedUp()
-    self.save.backedUp = true
+    self.save.backedUpV2 = true
+    self.save.backedUp = nil
 end
 
 function Data:SetMultiBossDelveBossKilled(zoneId, bossIndex)

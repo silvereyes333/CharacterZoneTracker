@@ -112,8 +112,9 @@ end
 
 function ZoneGuideTracker:FindAllObjectives(matchFunction, completionType, ...)
     local zoneIndex = GetCurrentMapZoneIndex()
+    local matches = {}
     if not zoneIndex or not self.objectives[zoneIndex] then
-        return
+        return matches
     end
     local objectivesList
     if completionType then
@@ -121,7 +122,6 @@ function ZoneGuideTracker:FindAllObjectives(matchFunction, completionType, ...)
     else
         objectivesList = self.objectives[zoneIndex]
     end
-    local matches = {}
     for completionType, objectives in pairs(objectivesList) do
         for activityIndex, objective in ipairs(objectives) do
             if matchFunction(objective, zoneIndex, ...) then

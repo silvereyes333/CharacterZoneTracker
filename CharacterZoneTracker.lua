@@ -4,7 +4,7 @@
 CharacterZoneTracker = {
     name = "CharacterZoneTracker",
     title = "Character Zone and Boss Completion",
-    version = "1.0.0",
+    version = "1.1.0",
     author = "silvereyes",
     debugMode = false,
 }
@@ -68,6 +68,7 @@ end
 
 COMPLETION_TYPES = {
     [ZONE_COMPLETION_TYPE_DELVES] = true,
+    [ZONE_COMPLETION_TYPE_GROUP_DELVES] = true,
     [ZONE_COMPLETION_TYPE_GROUP_BOSSES] = true,
     [ZONE_COMPLETION_TYPE_WORLD_EVENTS] = true,
 }
