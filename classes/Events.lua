@@ -73,18 +73,13 @@ end
 
 --[[  ]]
 function Events:PlayerActivated(eventCode, initial)
-    local zoneIndex = GetCurrentMapZoneIndex()
+    local zoneIndex = GetUnitZoneIndex("player")
     local zoneId = GetZoneId(zoneIndex)
     addon.Utility.Debug("EVENT_PLAYER_ACTIVATED(" .. tostring(eventCode) .. ", "..tostring(initial) .. ", zoneId: "..tostring(zoneId) .. ", zoneIndex: "..tostring(zoneIndex) .. ")", debug)
     addon.ZoneGuideTracker:SetActiveWorldEventInstanceId(GetNextWorldEventInstanceId())
     addon.ZoneGuideTracker:ResetDangerousMonsterNames()
     addon.BossFight:UpdateBossList()
     addon.ZoneGuideTracker:InitializeZone(zoneIndex)
-    
-    -- If running before Update 33 comes out, then back up all current progress when you first log in.
-    if GetAPIVersion() < 101033 then
-        addon.Data:BackupAllZonesAsync()
-    end
 end
 
 --[[  ]]
@@ -98,10 +93,6 @@ function Events:ReticleoverUnitDeathStateChanged(eventCode, unitTag, isDead)
 end
 
 function Events:ReticleTargetChanged(eventCode)
-    -- If in the overland, we're obviously not in a delve.
-    if not IsUnitInDungeon("player") then
-        return
-    end
     
     local unitTag = "reticleover"
     local unitName = GetUnitName(unitTag)
@@ -157,7 +148,7 @@ end
 
 --[[  ]]
 function Events:ZoneUpdate(eventCode, unitTag, newZoneName)
-    local zoneIndex = GetCurrentMapZoneIndex()
+    local zoneIndex = GetUnitZoneIndex(unitTag)
     local zoneId = GetZoneId(zoneIndex)
     addon.Utility.Debug("EVENT_ZONE_UPDATE(" .. tostring(newZoneName) .. ", zoneId: "..tostring(zoneId) .. ", zoneIndex: "..tostring(zoneIndex) .. ")", debug)
     addon.ZoneGuideTracker:InitializeZone(zoneIndex)

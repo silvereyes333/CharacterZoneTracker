@@ -1,17 +1,12 @@
 local addon = CharacterZoneTracker
 local debug = false
-local ASYNC_TIMEOUT = 100
-local ASYNC_BACKUP_ALL_SCOPE = addon.name .. ".Data.BackupAllZonesAsync"
-local ASYNC_BACKUP_BATCH_SIZE = 500
 local COMPLETION_TYPES = addon:GetCompletionTypes()
 local save, trueCount, containsAnyUntrue
 
 local Data = ZO_Object:Subclass()
 
 function Data:New(...)
-    local instance = ZO_Object.New(self)
-    self.Initialize(instance, ...)
-    return instance
+    return ZO_Object.New(self)
 end
 
 function Data:Initialize()
@@ -24,8 +19,10 @@ function Data:Initialize()
     self.esouiNames = {
         AreAllActivitiesComplete = "AreAllZoneStoryActivitiesCompleteForZoneCompletionType",
         CanActivitiesContinue = "CanZoneStoryContinueTrackingActivitiesForCompletionType",
+        GetNumAssociatedAchievements = "GetNumAssociatedAchievementsForZoneCompletionType",
         GetNumCompletedActivities = "GetNumCompletedZoneActivitiesForZoneCompletionType",
         IsActivityComplete = "IsZoneStoryActivityComplete",
+        GetAssociatedAchievementId = "GetAssociatedAchievementIdForZoneCompletionType",
         GetPOIMapInfo = "GetPOIMapInfo",
         GetPOIPinIcon = "GetPOIPinIcon",
     }
@@ -55,47 +52,24 @@ function Data:Closure(functionName)
 end
 
 --[[  ]]
-function Data:AreAllActivitiesComplete(zoneId, completionType)
-    if addon:IsCompletionTypeTracked(completionType) then
-        return not containsAnyUntrue(self, zoneId, completionType)
-    end
-    return self.esoui.AreAllZoneStoryActivitiesCompleteForZoneCompletionType(zoneId, completionType)
-end
-
-function Data:BackupAllZonesAsync(startZoneIndex)
-    if self:GetIsBackedUp() then
-        return
-    end
-    EVENT_MANAGER:UnregisterForUpdate(ASYNC_BACKUP_ALL_SCOPE)
-    if not startZoneIndex then
-        startZoneIndex = 1
-    end
-    for zoneIndex = startZoneIndex, startZoneIndex + ASYNC_BACKUP_BATCH_SIZE do
-        local zoneId = GetZoneId(zoneIndex)
-        if not zoneId or zoneId < 1 then
-            -- Print backup success message to chat
-            addon.Utility.Print(zo_strformat(GetString(SI_CZB_BACKUP_FINISHED), GetUnitName("player")))
-            self:SetIsBackedUp()
-            return
-        end
-        self:LoadBaseGameCompletionForZone(zoneIndex)
-    end
-    EVENT_MANAGER:RegisterForUpdate(ASYNC_BACKUP_ALL_SCOPE, ASYNC_TIMEOUT, self:GenerateBackupAllZonesAsyncCallback(startZoneIndex + ASYNC_BACKUP_BATCH_SIZE + 1))
+function Data:GetAssociatedAchievementId(completionZoneId, completionType, associatedAchievementIndex)
+    return 0
 end
 
 --[[  ]]
-function Data:CanActivitiesContinue(zoneId, completionType)
+function Data:AreAllActivitiesComplete(completionZoneId, completionType)
     if addon:IsCompletionTypeTracked(completionType) then
-        return containsAnyUntrue(self, zoneId, completionType)
+        return not containsAnyUntrue(self, completionZoneId, completionType)
     end
-    return self.esoui.CanZoneStoryContinueTrackingActivitiesForCompletionType(zoneId, completionType)
+    return self.esoui.AreAllZoneStoryActivitiesCompleteForZoneCompletionType(completionZoneId, completionType)
 end
 
 --[[  ]]
-function Data:GenerateBackupAllZonesAsyncCallback(startZoneIndex)
-    return function()
-        self:BackupAllZonesAsync(startZoneIndex)
+function Data:CanActivitiesContinue(completionZoneId, completionType)
+    if addon:IsCompletionTypeTracked(completionType) then
+        return containsAnyUntrue(self, completionZoneId, completionType)
     end
+    return self.esoui.CanZoneStoryContinueTrackingActivitiesForCompletionType(completionZoneId, completionType)
 end
 
 --[[  ]]
@@ -111,22 +85,43 @@ function Data:GetIsMultiBossDelveBossKilled(zoneId, bossIndex)
 end
 
 --[[  ]]
-function Data:GetNumCompletedActivities(zoneId, completionType)
+function Data:GetNumAssociatedAchievements(completionZoneId, completionType)
+    return 0
+end
+
+--[[  ]]
+function Data:GetNumCompletedActivities(completionZoneId, completionType)
     if addon:IsCompletionTypeTracked(completionType) then
-        return trueCount(self, zoneId, completionType)
+        return trueCount(self, completionZoneId, completionType)
     end
-    return self.esoui.GetNumCompletedZoneActivitiesForZoneCompletionType(zoneId, completionType)
+    return self.esoui.GetNumCompletedZoneActivitiesForZoneCompletionType(completionZoneId, completionType)
 end
 
 function Data:GetPOIMapInfo(zoneIndex, poiIndex)
   
-    addon.ZoneGuideTracker:InitializeZone(zoneIndex)
-    local poiObjective, completionType = addon.ZoneGuideTracker:GetPOIObjective(nil, poiIndex)
     local xLoc, zLoc, poiPinType, icon, isShownInCurrentMap, linkedCollectibleIsLocked, isDiscovered, isNearby = self.esoui.GetPOIMapInfo(zoneIndex, poiIndex)
-    if addon:IsCompletionTypeTracked(completionType) then
-        local zoneId = GetZoneId(zoneIndex)
+    
+    local zoneId = GetZoneId(zoneIndex)
+    if zoneId == 0 then
+        return xLoc, zLoc, poiPinType, icon, isShownInCurrentMap, linkedCollectibleIsLocked, isDiscovered, isNearby
+    end
+    
+    local completionZoneId = GetZoneStoryZoneIdForZoneId(zoneId)
+    if completionZoneId == 0 then
+        return xLoc, zLoc, poiPinType, icon, isShownInCurrentMap, linkedCollectibleIsLocked, isDiscovered, isNearby
+    end
+    
+    local completionZoneIndex = GetZoneIndex(completionZoneId)
+    if completionZoneIndex == 0 then
+        return xLoc, zLoc, poiPinType, icon, isShownInCurrentMap, linkedCollectibleIsLocked, isDiscovered, isNearby
+    end
+  
+    addon.ZoneGuideTracker:InitializeZone(completionZoneId)
+    local poiObjective, completionType = addon.ZoneGuideTracker:GetPOIObjective(completionZoneIndex, nil, zoneIndex, poiIndex)
+    
+    if poiObjective and addon:IsCompletionTypeTracked(completionType) then
         local priorIcon = icon
-        if self:IsActivityComplete(zoneId, completionType, poiObjective.activityIndex) then
+        if self:IsActivityComplete(completionZoneId, completionType, poiObjective.activityIndex) then
             poiPinType = MAP_PIN_TYPE_POI_COMPLETE
             icon = icon:gsub("_incomplete", "_complete")
         else
@@ -137,6 +132,10 @@ function Data:GetPOIMapInfo(zoneIndex, poiIndex)
     return xLoc, zLoc, poiPinType, icon, isShownInCurrentMap, linkedCollectibleIsLocked, isDiscovered, isNearby 
 end
 
+function Data:GetPOIMapInfoOnAccount(zoneIndex, poiIndex)
+    return self.esoui.GetPOIMapInfo(zoneIndex, poiIndex)
+end
+
 --[[  ]]
 function Data:GetPOIPinIcon(poiId, checkNearby)
     local zoneIndex, poiIndex = GetPOIIndices(poiId)
@@ -145,44 +144,44 @@ function Data:GetPOIPinIcon(poiId, checkNearby)
 end
 
 --[[  ]]
-function Data:IsActivityComplete(zoneId, completionType, activityIndex)
-    addon.Utility.Debug("IsActivityComplete(zoneId: " .. tostring(zoneId) .. ", completionType: " .. tostring(completionType) .. ", activityIndex: " .. tostring(activityIndex) .. ")", debug)
+function Data:IsActivityComplete(completionZoneId, completionType, activityIndex)
+    addon.Utility.Debug("IsActivityComplete(completionZoneId: " .. tostring(completionZoneId) .. ", completionType: " .. tostring(completionType) .. ", activityIndex: " .. tostring(activityIndex) .. ")", debug)
     if addon:IsCompletionTypeTracked(completionType) then
-        addon.Utility.Debug("Returning " .. tostring(self.save[zoneId] and self.save[zoneId][completionType] and self.save[zoneId][completionType][activityIndex]), debug)
-        return self.save[zoneId] and self.save[zoneId][completionType] and self.save[zoneId][completionType][activityIndex] or false
+        addon.Utility.Debug("Returning " .. tostring(self.save[completionZoneId] and self.save[completionZoneId][completionType] and self.save[completionZoneId][completionType][activityIndex]), debug)
+        return self.save[completionZoneId] and self.save[completionZoneId][completionType] and self.save[completionZoneId][completionType][activityIndex] or false
     end
-    return self.esoui.IsZoneStoryActivityComplete(zoneId, completionType, activityIndex)
+    return self.esoui.IsZoneStoryActivityComplete(completionZoneId, completionType, activityIndex)
 end
 
 --[[  ]]
-function Data:IsActivityCompletedOnAccount(zoneId, completionType, activityIndex)
-    return self.esoui.IsZoneStoryActivityComplete(zoneId, completionType, activityIndex)
+function Data:IsActivityCompletedOnAccount(completionZoneId, completionType, activityIndex)
+    return self.esoui.IsZoneStoryActivityComplete(completionZoneId, completionType, activityIndex)
 end
 
 --[[  ]]
-function Data:LoadBaseGameCompletion(zoneId, completionType, activityIndex)
-    local baseGameActivityComplete = self.esoui.IsZoneStoryActivityComplete(zoneId, completionType, activityIndex)
-    save(self, zoneId, completionType, activityIndex, baseGameActivityComplete)
+function Data:LoadBaseGameCompletion(completionZoneId, completionType, activityIndex)
+    local baseGameActivityComplete = self.esoui.IsZoneStoryActivityComplete(completionZoneId, completionType, activityIndex)
+    save(self, completionZoneId, completionType, activityIndex, baseGameActivityComplete)
 end
 
-function Data:LoadBaseGameCompletionForZone(zoneIndex)
-    local zoneId = GetZoneId(zoneIndex)
+function Data:LoadBaseGameCompletionForZone(completionZoneIndex)
+    local completionZoneId = GetZoneId(completionZoneIndex)
     local _
     for completionType, _ in pairs(COMPLETION_TYPES) do
-        for activityIndex = 1, GetNumZoneActivitiesForZoneCompletionType(zoneId, completionType) do
-            addon.Data:LoadBaseGameCompletion(zoneId, completionType, activityIndex)
+        for activityIndex = 1, GetNumZoneActivitiesForZoneCompletionType(completionZoneId, completionType) do
+            addon.Data:LoadBaseGameCompletion(completionZoneId, completionType, activityIndex)
         end
     end
 end
 
 --[[  ]]
-function Data:SetActivityComplete(zoneId, completionType, activityIndex, complete)
-    addon.Utility.Debug("SetActivityComplete(zoneId: " .. tostring(zoneId) .. ", completionType: " .. tostring(completionType) .. ", activityIndex: " .. tostring(activityIndex) .. ", complete: " .. tostring(complete) .. ")", debug)
+function Data:SetActivityComplete(completionZoneId, completionType, activityIndex, complete)
+    addon.Utility.Debug("SetActivityComplete(completionZoneId: " .. tostring(completionZoneId) .. ", completionType: " .. tostring(completionType) .. ", activityIndex: " .. tostring(activityIndex) .. ", complete: " .. tostring(complete) .. ")", debug)
     if not addon:IsCompletionTypeTracked(completionType) then
         return
     end
     
-    return save(self, zoneId, completionType, activityIndex, complete)
+    return save(self, completionZoneId, completionType, activityIndex, complete)
 end
 
 --[[  ]]
@@ -207,10 +206,10 @@ end
 -- 
 ---------------------------------------
 
-function containsAnyUntrue(self, zoneId, completionType)
-    if self.save[zoneId] and self.save[zoneId][completionType] then
-        for activityIndex = 1, GetNumZoneActivitiesForZoneCompletionType(zoneId, completionType) do
-            if not self.save[zoneId] or not self.save[zoneId][completionType] or not self.save[zoneId][completionType][activityIndex] then
+function containsAnyUntrue(self, completionZoneId, completionType)
+    if self.save[completionZoneId] and self.save[completionZoneId][completionType] then
+        for activityIndex = 1, GetNumZoneActivitiesForZoneCompletionType(completionZoneId, completionType) do
+            if not self.save[completionZoneId] or not self.save[completionZoneId][completionType] or not self.save[completionZoneId][completionType][activityIndex] then
                 return true
             end
         end
@@ -218,31 +217,31 @@ function containsAnyUntrue(self, zoneId, completionType)
     return false
 end
 
-function save(self, zoneId, completionType, activityIndex, complete)
-    if not self.save[zoneId] then
+function save(self, completionZoneId, completionType, activityIndex, complete)
+    if not self.save[completionZoneId] then
         if complete then
-            self.save[zoneId] = {}
+            self.save[completionZoneId] = {}
         else
             return false
         end
     end
-    if not self.save[zoneId][completionType] then
+    if not self.save[completionZoneId][completionType] then
         if complete then
-            self.save[zoneId][completionType] = {}
+            self.save[completionZoneId][completionType] = {}
         else
             return false
         end
     end
-    local success = (self.save[zoneId][completionType][activityIndex] == true and not complete)
-                    or (not self.save[zoneId][completionType][activityIndex] and complete)
-    self.save[zoneId][completionType][activityIndex] = complete or nil
+    local success = (self.save[completionZoneId][completionType][activityIndex] == true and not complete)
+                    or (not self.save[completionZoneId][completionType][activityIndex] and complete)
+    self.save[completionZoneId][completionType][activityIndex] = complete or nil
     return success
 end
 
-function trueCount(self, zoneId, completionType)
+function trueCount(self, completionZoneId, completionType)
     local count = 0
-    for activityIndex = 1, GetNumZoneActivitiesForZoneCompletionType(zoneId, completionType) do
-        if self.save[zoneId] and self.save[zoneId][completionType] and self.save[zoneId][completionType][activityIndex] then
+    for activityIndex = 1, GetNumZoneActivitiesForZoneCompletionType(completionZoneId, completionType) do
+        if self.save[completionZoneId] and self.save[completionZoneId][completionType] and self.save[completionZoneId][completionType][activityIndex] then
             count = count + 1
         end
     end

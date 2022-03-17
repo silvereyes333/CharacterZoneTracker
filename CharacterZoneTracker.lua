@@ -3,8 +3,8 @@
 
 CharacterZoneTracker = {
     name = "CharacterZoneTracker",
-    title = "Character Zone and Boss Completion",
-    version = "1.1.0",
+    title = "Character Zone Tracker",
+    version = "1.2.0",
     author = "silvereyes",
     debugMode = false,
 }
@@ -55,15 +55,12 @@ function onAddonLoaded(event, name)
     if name ~= addon.name then return end
     EVENT_MANAGER:UnregisterForEvent(addon.name, EVENT_ADD_ON_LOADED)
     
-    addon.Events:Initialize()
-    
-    -- Everything below this point should only run after Update 33 comes out
-    if GetAPIVersion() < 101033 then
-        return
-    end
-  
+    addon.timeCalculatingLevenshtein = 0
+    addon.SubzoneMap:Initialize()
+    addon.Data:Initialize()
     addon.Compass:Initialize()
     addon.WorldMap:Initialize()
+    addon.Events:Initialize()
 end
 
 COMPLETION_TYPES = {

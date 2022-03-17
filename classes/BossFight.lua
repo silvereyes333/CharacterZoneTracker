@@ -45,6 +45,11 @@ function BossFight:AreAllBossesKilled()
     return true
 end
 
+function BossFight:IsActive()
+    local unitTag = next(self.bossUnitTags)
+    return unitTag and true or false
+end
+
 function BossFight:RegisterKill(unitTag)
     if not self.bossUnitTags[unitTag] then
         return

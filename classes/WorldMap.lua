@@ -163,7 +163,22 @@ end
 
 function WorldMap:OnKeyboardLoadAccountButtonClick(control)
     local zoneIndex = GetCurrentMapZoneIndex()
-    local zoneName = GetZoneNameByIndex(zoneIndex)
+    
+    if zoneIndex == 0 then
+        return
+    end
+    
+    local zoneId = GetZoneId(zoneIndex)
+    if zoneId == 0 then
+        return
+    end
+    
+    local completionZoneId = GetZoneStoryZoneIdForZoneId(zoneId)
+    if completionZoneId == 0 then
+        return
+    end
+    
+    local zoneName = GetZoneNameById(completionZoneId)
     ZO_Dialogs_ShowDialog(CBZ_DIALOG_NAME_CONFIRM_LOAD_ACCOUNT, nil, {
 				titleParams = { },
 				mainTextParams = { ZO_HIGHLIGHT_TEXT:Colorize(zoneName) },
@@ -172,7 +187,22 @@ end
 
 function WorldMap:OnKeyboardResetButtonClick(control)
     local zoneIndex = GetCurrentMapZoneIndex()
-    local zoneName = GetZoneNameByIndex(zoneIndex)
+    
+    if zoneIndex == 0 then
+        return
+    end
+    
+    local zoneId = GetZoneId(zoneIndex)
+    if zoneId == 0 then
+        return
+    end
+    
+    local completionZoneId = GetZoneStoryZoneIdForZoneId(zoneId)
+    if completionZoneId == 0 then
+        return
+    end
+    
+    local zoneName = GetZoneNameById(completionZoneId)
     ZO_Dialogs_ShowDialog(CBZ_DIALOG_NAME_CONFIRM_ZONE_RESET, nil, {
 				titleParams = { },
 				mainTextParams = { ZO_HIGHLIGHT_TEXT:Colorize(zoneName) },
@@ -187,16 +217,35 @@ end
 ---------------------------------------
 
 function getPinDetails(pin)
+    local poiZoneIndex = pin:GetPOIZoneIndex()
+    if poiZoneIndex == -1 then
+        return
+    end
     local poiIndex = pin:GetPOIIndex()
     if poiIndex == -1 then
         return
     end
-    local objective, completionType = addon.ZoneGuideTracker:GetPOIObjective(nil, poiIndex)
-    local zoneId = GetZoneId(objective.zoneIndex)
-    return objective, completionType, zoneId
+    
+    local poiZoneId = GetZoneId(poiZoneIndex)
+    if poiZoneId == 0 then
+        return
+    end
+    
+    local completionZoneId = GetZoneStoryZoneIdForZoneId(poiZoneId)
+    if completionZoneId == 0 then
+        return
+    end
+    
+    local completionZoneIndex = GetZoneIndex(completionZoneId)
+    if completionZoneIndex == 0 then
+        return
+    end
+    
+    local objective, completionType = addon.ZoneGuideTracker:GetPOIObjective(completionZoneIndex, nil, poiZoneIndex, poiIndex)
+    return objective, completionType, completionZoneId
 end
 function getCompleteText(pin)
-    local objective, completionType, zoneId = getPinDetails(pin)
+    local objective, completionType = getPinDetails(pin)
     if not objective then
         return
     end
@@ -204,35 +253,32 @@ function getCompleteText(pin)
     return zo_strformat(stringTemplate, objective.name)
 end
 function getResetText(pin)
-    local objective, completionType, zoneId, complete = getPinDetails(pin)
+    local objective, completionType = getPinDetails(pin)
     if not objective then
         return
     end
     return zo_strformat(SI_GUILD_FINDER_GUILD_INFO_ATTRIBUTE_FORMATTER, GetString(SI_OPTIONS_RESET), objective.name)
 end
 function markPinComplete(pin)
-    local objective, completionType, zoneId = getPinDetails(pin)
+    local objective, completionType, completionZoneId = getPinDetails(pin)
     if not objective then
         return
     end
-    addon.Data:SetActivityComplete(zoneId, completionType, objective.activityIndex, true)
+    
+    addon.Data:SetActivityComplete(completionZoneId, completionType, objective.activityIndex, true)
     addon.ZoneGuideTracker:UpdateUIAndAnnounce(objective, true)
 end
 function markPinIncomplete(pin)
-    local objective, completionType, zoneId = getPinDetails(pin)
+    local objective, completionType, completionZoneId = getPinDetails(pin)
     if not objective then
         return
     end
-    addon.Data:SetActivityComplete(zoneId, completionType, objective.activityIndex, nil)
+    
+    addon.Data:SetActivityComplete(completionZoneId, completionType, objective.activityIndex, nil)
     addon.ZoneGuideTracker:UpdateUIAndAnnounce(objective, false)
-    -- TODO: show reset message
 end
 function shouldPinShowCompletionMenu(pin)
-    local poiIndex = pin:GetPOIIndex()
-    if poiIndex == -1 then
-        return
-    end
-    local objective = addon.ZoneGuideTracker:GetPOIObjective(nil, poiIndex)
+    local objective = getPinDetails(pin)
     return objective ~= nil
 end
 
