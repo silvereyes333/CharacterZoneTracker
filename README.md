@@ -6,11 +6,12 @@ Elder Scrolls Online addon that tracks zone completion for delves, world bosses 
 
 ## FEATURES
 
-- Backed up zone completion for delves, world bosses and world events (dolmens, geysers, etc.) in the previous release, Update 32.
-- Tracks character zone completion for delves, world bosses and world events once Update 33 is released.
-- Shows completion popup announcements for delves, world bosses and world events on individual characters once Update 33 is released.
-- Adds tools to reset delves, world bosses or world events. (Keyboard only)
-- Adds tools to set a character to load delve, world boss and world event completion from the account (Keyboard only)
+- Tracks character zone completion for delves, world bosses and world events.
+- Shows completion popup announcements for delves, world bosses and world events on individual characters.
+- Adds tools to reset delves, world bosses or world events for a given character and zone. (Keyboard only)
+- Adds tools to set a character to load delve, world boss and world event completion from the account for a given character and zone (Keyboard only)
+- If run before account-wide achievements were released, backed up zone completion for delves, world bosses and world events.
+- If not run before account-wide achievements were released, the zone completion for delves, world bosses and world events will be reset.
 
 
 
@@ -20,13 +21,16 @@ Elder Scrolls Online addon that tracks zone completion for delves, world bosses 
 
 
 
+## ACKNOWLEDGEMENTS
+
+- A very special thanks to the administrators and editors of https://en.uesp.net/. Without them, this addon would not have been practical to write.
+
+
+
 ## KNOWN ISSUES / PLANNED FIXES
 
 - Compass shows account-wide icons. This is not intended, and will be fixed in a future update.
-- No text localization for non-English languages, yet.
-- For non-English languages, any kills of a dangerous monster (e.g. Dwarven Centurion, Storm Atronach, Troll, etc.) inside of a delve released before Clockwork City will cause the delve to be reported as complete. This is not indented, and will be fixed in a future update.
-- Multi-boss delves in Cyrodiil, Craglorn and Hew's Bane report delve completion after only a single boss kill. This is not intended, and will be fixed in a future update.
-- Delves with quests that include bosses inside the delve (e.g. Vessel of Worms in the Traitor's Vault quest Half-Formed Understandings, in Artaeum) will be marked complete when the quest boss is killed. This is not intended, and will be fixed in a future update.
+- No user interface text localization for non-English languages, yet.
 
 
 
@@ -34,14 +38,31 @@ Elder Scrolls Online addon that tracks zone completion for delves, world bosses 
 
 - A game client crash will wipe your progress. To ensure your progress is saved, either relog, or do a /reloadui periodically.
 - Progress is tracked in the local SavedVariables folder. Back up your files, preferably to the cloud, to prevent data loss if your storage device fails.
+- If your group kills a boss or completes a world event while you are stuck on a load screen, you will not get credit.
 
 
 
 ## RELEASE NOTES
 
+### Version 1.3.0
+- Added tracking support for Craglorn group delves
+- Added tracking support for multi-boss delves in all zones, the vast majority being in Craglorn and Cyrodiil
+- Added acknowledgements to https://en.uesp.net/ for providing boss names and difficulty data for delves. Thank you!
+- Full tracking support added for FR, JP and RU language clients
+- Bugfix: Killing side quest bosses in a delve will no longer cause the delve to complete, unless the quest boss just happens to also be the delve completion boss.
+- Bugfix: Fix delve or world bosses that have no large boss bar (mostly in older content) not being marked as complete when you don't get the killing blow.
+- Bugfix: Fix map pins showing up with account-wide status until an objective is cleared
+- Bugfix: Fix map POI menus not appearing for zones your character is not in.
+- Bugfix: Fix reset map button not working (regression bug from 1.2.0)
+- Bugfix: Multi-boss delve boss kill tracking data will no longer persist in saved vars once the delve is cleared
+- Bugfix: Cleaned up old saved vars values that are no longer needed.
+- Removed addon description text about backing up Update 32 data, to avoid confusion.
+- Moved all localization text to the localization folder
+- Small code optimizations
+
 ### Version 1.2.1
-- Bugfix: fix error thrown when a world event ends and you are not in range.
-- Bugfix: fix errors thrown when hovering over map pins in gamepad mode
+- Bugfix: Fix error thrown when a world event ends and you are not in range
+- Bugfix: Fix errors thrown when hovering over map pins in gamepad mode
 
 ### Version 1.2.0
 - Replace achievement tooltips in zone guide / map completion with character-specific zone guide tooltips

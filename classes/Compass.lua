@@ -51,9 +51,15 @@ end
 --[[  ]]
 function Compass:GetCenterOveredPinInfo(control, centerOveredPinIndex)
     local description, pinType, distanceFromPlayerCM, drawLayer, drawLevel, suppressed = self.esoui.GetCenterOveredPinInfo(control, centerOveredPinIndex)
-    local objective, completionType = addon.ZoneGuideTracker:GetObjectiveByName(description)
+    
+    local zoneId, completionZoneId, zoneIndex, completionZoneIndex = addon.Utility.GetZoneIdsAndIndexes(GetCurrentMapZoneIndex())
+    if completionZoneIndex == 0 then
+        return description, pinType, distanceFromPlayerCM, drawLayer, drawLevel, suppressed
+    end
+    
+    local objective, completionType = addon.ZoneGuideTracker:GetObjectiveByName(completionZoneIndex, nil, description)
     if objective then
-        local complete = addon.Data:IsActivityComplete(GetZoneId(objective.zoneIndex), completionType, objective.activityIndex)
+        local complete = addon.Data:IsActivityComplete(GetZoneId(objective.poiZoneIndex), completionType, objective.activityIndex)
         pinType = complete and MAP_PIN_TYPE_POI_COMPLETE or MAP_PIN_TYPE_POI_SEEN
     end
     return description, pinType, distanceFromPlayerCM, drawLayer, drawLevel, suppressed

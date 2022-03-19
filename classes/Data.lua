@@ -13,6 +13,7 @@ function Data:Initialize()
     
     self.initialized = true
     self.save = LibSavedVars:NewCharacterSettings(addon.name .. "Data", {})
+                            :RemoveSettings(2, "backedUpV2", "backedUp")
                             :EnableDefaultsTrimming()
     self.esoui = {}
     
@@ -73,8 +74,39 @@ function Data:CanActivitiesContinue(completionZoneId, completionType)
 end
 
 --[[  ]]
-function Data:GetIsBackedUp()
-    return self.save.backedUpV2
+function Data:ClearMultiBossDelveBossKills(completionZoneId, completionType, activityIndex)
+  
+    if not self.save.delveBossKills then
+        return
+    end
+    local completionZoneIndex = GetZoneIndex(completionZoneId)
+    if completionZoneIndex == 0 then
+        addon.Utility.Debug("Invalid completion zone id " .. tostring(completionZoneId) 
+            .. ". Cannot clear multi boss delve boss kills.", debug)
+        return
+    end
+    local objective = addon.ZoneGuideTracker:GetObjective(completionZoneIndex, completionType, activityIndex)
+    if not objective then
+        addon.Utility.Debug("No objective found for zone index " .. tostring(completionZoneIndex) 
+            .. ", completionType: " .. tostring(completionType) .. ", activityIndex: " .. tostring(activityIndex) 
+            .. ". Cannot clear multi boss delve boss kills.", debug)
+        return
+    end
+    local delveZoneId = addon.SubzoneMap:FindBestSubzoneNameMatch(completionZoneId, objective.name)
+    if not delveZoneId then
+        addon.Utility.Debug("No subzone for completion zone id " .. tostring(completionZoneId) 
+            .. " matches the activity name '" .. tostring(objective.name) 
+            .. "'. Cannot clear multi boss delve boss kills.", debug)
+        return
+    end
+    
+    if not self.save.delveBossKills[delveZoneId] then
+        addon.Utility.Debug("No boss kills to clear for zone id " .. tostring(delveZoneId) 
+            .. ". Cannot clear multi boss delve boss kills.", debug)
+        return
+    end
+    ZO_ClearTable(self.save.delveBossKills[delveZoneId])
+    self.save.delveBossKills[delveZoneId] = nil
 end
 
 function Data:GetIsMultiBossDelveBossKilled(zoneId, bossIndex)
@@ -145,9 +177,9 @@ end
 
 --[[  ]]
 function Data:IsActivityComplete(completionZoneId, completionType, activityIndex)
-    addon.Utility.Debug("IsActivityComplete(completionZoneId: " .. tostring(completionZoneId) .. ", completionType: " .. tostring(completionType) .. ", activityIndex: " .. tostring(activityIndex) .. ")", debug)
+    --addon.Utility.Debug("IsActivityComplete(completionZoneId: " .. tostring(completionZoneId) .. ", completionType: " .. tostring(completionType) .. ", activityIndex: " .. tostring(activityIndex) .. ")", debug)
     if addon:IsCompletionTypeTracked(completionType) then
-        addon.Utility.Debug("Returning " .. tostring(self.save[completionZoneId] and self.save[completionZoneId][completionType] and self.save[completionZoneId][completionType][activityIndex]), debug)
+        --addon.Utility.Debug("Returning " .. tostring(self.save[completionZoneId] and self.save[completionZoneId][completionType] and self.save[completionZoneId][completionType][activityIndex]), debug)
         return self.save[completionZoneId] and self.save[completionZoneId][completionType] and self.save[completionZoneId][completionType][activityIndex] or false
     end
     return self.esoui.IsZoneStoryActivityComplete(completionZoneId, completionType, activityIndex)
@@ -161,15 +193,19 @@ end
 --[[  ]]
 function Data:LoadBaseGameCompletion(completionZoneId, completionType, activityIndex)
     local baseGameActivityComplete = self.esoui.IsZoneStoryActivityComplete(completionZoneId, completionType, activityIndex)
-    save(self, completionZoneId, completionType, activityIndex, baseGameActivityComplete)
+    local changed = save(self, completionZoneId, completionType, activityIndex, baseGameActivityComplete)
+    return changed, baseGameActivityComplete
 end
 
-function Data:LoadBaseGameCompletionForZone(completionZoneIndex)
-    local completionZoneId = GetZoneId(completionZoneIndex)
-    local _
+function Data:LoadBaseGameCompletionForZone(completionZoneId)
     for completionType, _ in pairs(COMPLETION_TYPES) do
         for activityIndex = 1, GetNumZoneActivitiesForZoneCompletionType(completionZoneId, completionType) do
-            addon.Data:LoadBaseGameCompletion(completionZoneId, completionType, activityIndex)
+            -- Set the activity completion to be the same as account-wide
+            local changed = addon.Data:LoadBaseGameCompletion(completionZoneId, completionType, activityIndex)
+            -- If the completion changed, whether we are resetting or completing the activity, we don't need incomplete boss kill tracking information anymore
+            if changed then
+                self:ClearMultiBossDelveBossKills(completionZoneId, completionType, activityIndex)
+            end
         end
     end
 end
@@ -180,14 +216,13 @@ function Data:SetActivityComplete(completionZoneId, completionType, activityInde
     if not addon:IsCompletionTypeTracked(completionType) then
         return
     end
-    
-    return save(self, completionZoneId, completionType, activityIndex, complete)
-end
-
---[[  ]]
-function Data:SetIsBackedUp()
-    self.save.backedUpV2 = true
-    self.save.backedUp = nil
+    -- Set the activity completion
+    local changed = save(self, completionZoneId, completionType, activityIndex, complete)
+    -- If the completion changed, whether we are resetting or completing the activity, we don't need incomplete boss kill tracking information anymore
+    if changed then
+        self:ClearMultiBossDelveBossKills(completionZoneId, completionType, activityIndex)
+    end
+    return changed
 end
 
 function Data:SetMultiBossDelveBossKilled(zoneId, bossIndex)

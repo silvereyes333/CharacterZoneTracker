@@ -162,18 +162,8 @@ function WorldMap:PrehookSetupPinChoiceMenu(pinDatas)
 end
 
 function WorldMap:OnKeyboardLoadAccountButtonClick(control)
-    local zoneIndex = GetCurrentMapZoneIndex()
-    
-    if zoneIndex == 0 then
-        return
-    end
-    
-    local zoneId = GetZoneId(zoneIndex)
-    if zoneId == 0 then
-        return
-    end
-    
-    local completionZoneId = GetZoneStoryZoneIdForZoneId(zoneId)
+  
+    local zoneId, completionZoneId = addon.Utility.GetZoneIdsAndIndexes(GetCurrentMapZoneIndex())
     if completionZoneId == 0 then
         return
     end
@@ -186,18 +176,8 @@ function WorldMap:OnKeyboardLoadAccountButtonClick(control)
 end
 
 function WorldMap:OnKeyboardResetButtonClick(control)
-    local zoneIndex = GetCurrentMapZoneIndex()
-    
-    if zoneIndex == 0 then
-        return
-    end
-    
-    local zoneId = GetZoneId(zoneIndex)
-    if zoneId == 0 then
-        return
-    end
-    
-    local completionZoneId = GetZoneStoryZoneIdForZoneId(zoneId)
+  
+    local zoneId, completionZoneId = addon.Utility.GetZoneIdsAndIndexes(GetCurrentMapZoneIndex())
     if completionZoneId == 0 then
         return
     end
@@ -217,29 +197,26 @@ end
 ---------------------------------------
 
 function getPinDetails(pin)
-    if not pin or not pin.GetPOIZoneIndex then
+    if not pin then
+        addon.Utility.Debug("No pin data", debug)
+        return
+    end
+    if not pin.GetPOIZoneIndex then
+        addon.Utility.Debug("Pin has no GetPOIZoneIndex() function", debug)
         return
     end
     local poiZoneIndex = pin:GetPOIZoneIndex()
     if poiZoneIndex == -1 then
+        addon.Utility.Debug("Pin POI zone index is -1", debug)
         return
     end
     local poiIndex = pin:GetPOIIndex()
     if poiIndex == -1 then
+        addon.Utility.Debug("Pin POI index is -1", debug)
         return
     end
     
-    local poiZoneId = GetZoneId(poiZoneIndex)
-    if poiZoneId == 0 then
-        return
-    end
-    
-    local completionZoneId = GetZoneStoryZoneIdForZoneId(poiZoneId)
-    if completionZoneId == 0 then
-        return
-    end
-    
-    local completionZoneIndex = GetZoneIndex(completionZoneId)
+    local poiZoneId, completionZoneId, _, completionZoneIndex = addon.Utility.GetZoneIdsAndIndexes(poiZoneIndex)
     if completionZoneIndex == 0 then
         return
     end
@@ -269,7 +246,7 @@ function markPinComplete(pin)
     end
     
     addon.Data:SetActivityComplete(completionZoneId, completionType, objective.activityIndex, true)
-    addon.ZoneGuideTracker:UpdateUIAndAnnounce(objective, true)
+    addon.ZoneGuideTracker:UpdateUIAndAnnounce(objective)
 end
 function markPinIncomplete(pin)
     local objective, completionType, completionZoneId = getPinDetails(pin)
@@ -278,10 +255,13 @@ function markPinIncomplete(pin)
     end
     
     addon.Data:SetActivityComplete(completionZoneId, completionType, objective.activityIndex, nil)
-    addon.ZoneGuideTracker:UpdateUIAndAnnounce(objective, false)
+    addon.ZoneGuideTracker:UpdateUI(objective)
 end
 function shouldPinShowCompletionMenu(pin)
     local objective = getPinDetails(pin)
+    if objective == nil then
+        addon.Utility.Debug("Pin matched no objective", debug)
+    end
     return objective ~= nil
 end
 

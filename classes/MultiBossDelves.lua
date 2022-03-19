@@ -6,6 +6,7 @@
   
 local addon = CharacterZoneTracker
 local debug = false
+local _
 local MULTIBOSS_DELVE_DATA
 
 -- Singleton class
@@ -18,7 +19,30 @@ function MultiBossDelves:New(...)
 end
 
 function MultiBossDelves:Initialize()
-  
+    -- Load localized boss names
+    MULTIBOSS_DELVE_DATA = CZT_MULTI_BOSS_DELVE_MONSTERS
+    -- Clear the global variable
+    CZT_MULTI_BOSS_DELVE_MONSTERS = nil
+end
+
+-- /script CharacterZoneTracker.MultiBossDelves:PrintArray()
+function MultiBossDelves:PrintArray()
+    local zoneIds = {}
+    for zoneId, _ in pairs(MULTIBOSS_DELVE_DATA) do
+        table.insert(zoneIds, zoneId)
+    end
+    table.sort(zoneIds)
+    for _, zoneId in ipairs(zoneIds) do
+        local zoneName = zo_strformat("<<1>>", GetZoneNameById(zoneId))
+        local completionZoneId = GetZoneStoryZoneIdForZoneId(zoneId)
+        local completionZoneName = zo_strformat("<<1>>", GetZoneNameById(completionZoneId))
+        local localizedBossNames = {}
+        for _, bossName in ipairs(self:GetBossList(zoneId)) do
+            table.insert(localizedBossNames, LocalizeString("<<1>>", bossName))
+        end
+        d("\n	-- " .. tostring(zoneName) .. ", " .. tostring(completionZoneName))
+        d("	[" .. tostring(zoneId) .. "] = {" .. '"' .. table.concat(localizedBossNames, '", "') .. '"' .. "},")
+    end
 end
 
 
@@ -47,13 +71,19 @@ function MultiBossDelves:IsZoneMultiBossDelve(zoneId)
     return MULTIBOSS_DELVE_DATA[zoneId] ~= nil
 end
 
+function MultiBossDelves:IsZoneMultiBoss(zoneId, targetName)
+    return MULTIBOSS_DELVE_DATA[zoneId] and ZO_IsElementInNumericallyIndexedTable(MULTIBOSS_DELVE_DATA[zoneId], targetName) or false
+end
+
 function MultiBossDelves:GetBossList(zoneId)
-    local lang = string.lower(GetCVar("Language.2"))
-    local delveData = MULTIBOSS_DELVE_DATA[zoneId]
-    if not delveData then
-        return
+    return MULTIBOSS_DELVE_DATA[zoneId]
+end
+
+function MultiBossDelves:GetNumBosses(zoneId)
+    if not MULTIBOSS_DELVE_DATA[zoneId] then
+        return 0
     end
-    return delveData.bossNames[lang]
+    return #MULTIBOSS_DELVE_DATA[zoneId]
 end
 
 function MultiBossDelves:RegisterBossKill(zoneId, targetName)
@@ -76,95 +106,6 @@ end
 -- 
 ---------------------------------------
 
-MULTIBOSS_DELVE_DATA = {
-  
-    [497] = {
-        ["zoneId"] = 497,
-        ["parentZoneId"] = 181,
-        ["activityIndex"] = 1,
-        ["name"] = "Haynote Cave",
-        ["poiId"] = 505,
-        ["bossNames"] = {
-            ["en"] = {
-                "Theurgist Thelas",
-                "Diabolist Volcatia"
-            }
-        }
-    },
-    
-    [503] = {
-        ["zoneId"] = 503,
-        ["parentZoneId"] = 181,
-        ["activityIndex"] = 2,
-        ["name"] = "Pothole Caverns",
-        ["poiId"] = 507,
-        ["bossNames"] = {
-            ["en"] = {
-                "Serrin Vol",
-                "Diabolist Vethisa",
-                "Blighttooth"
-            }
-        }
-    },
-    
-    [501] = {
-        ["zoneId"] = 501,
-        ["parentZoneId"] = 181,
-        ["activityIndex"] = 3,
-        ["name"] = "Newt Cave",
-        ["poiId"] = 512,
-        ["bossNames"] = {
-            ["en"] = {
-                "Graveltooth",
-                "Rock Wing"
-            }
-        }
-    },
-    
-    [505] = 
-    {
-        ["zoneId"] = 505,
-        ["parentZoneId"] = 181,
-        ["activityIndex"] = 6,
-        ["name"] = "Red Ruby Cave",
-        ["poiId"] = 630,
-        ["bossNames"] = {
-            ["en"] = {
-                "Endare",
-                "Zandur"
-            }
-        }
-    },
-    
-    [502] = {
-        ["zoneId"] = 502,
-        ["parentZoneId"] = 181,
-        ["activityIndex"] = 4,
-        ["name"] = "Nisin Cave",
-        ["poiId"] = 534,
-        ["bossNames"] = {
-            ["en"] = {
-                "Barasatii",
-                "Volgo the Harrower"
-            }
-        }
-    },
-    
-    -- Underpall Cave, Cyrodiil
-    [533] = {
-        ["zoneId"] = 533,
-        ["parentZoneId"] = 181,
-        ["activityIndex"] = 17,
-        ["name"] = "Underpall Cave",
-        ["poiId"] = 510,
-        ["bossNames"] = {
-            ["en"] = {
-                "Raelynne Ashham",
-                "Emelin the Returned"
-            }
-        }
-    }
-}
 
 
 -- Create singleton

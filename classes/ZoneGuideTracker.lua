@@ -4,7 +4,7 @@
 local addon = CharacterZoneTracker
 local COMPLETION_TYPES = addon:GetCompletionTypes()
 local ZONE_ACTIVITY_NAME_MAX_EDIT_DISTANCE = 5
-local FIRST_ZONE_ID_WITH_DELVE_BOSS_UNIT_TAGS = 589
+local FIRST_ZONE_ID_WITH_DELVE_BOSS_UNIT_TAGS = 980
 local WORLD_EVENT_MAX_DISTANCE = 0.02
 local ZoneGuideTracker = ZO_Object:Subclass()
 
@@ -50,7 +50,7 @@ function ZoneGuideTracker:AnnounceCompletion(objective)
     if not eventHandler then
         return
     end
-    local messageParams = eventHandler(objective.zoneIndex, objective.poiIndex, level, experience, experience, championPoints)
+    local messageParams = eventHandler(objective.poiZoneIndex, objective.poiIndex, level, experience, experience, championPoints)
     if not messageParams then
         return
     end
@@ -87,12 +87,8 @@ function ZoneGuideTracker:DeactivateWorldEventInstance()
     -- Save the progress
     ZO_ClearTable(self.activeWorldEvent)
     self.activeWorldEvent = nil
-    local zoneId = GetZoneId(worldEventObjective.zoneIndex)
-    if zoneId == 0 then
-        return
-    end
-    
-    local completionZoneId = GetZoneStoryZoneIdForZoneId(zoneId)
+  
+    local zoneId, completionZoneId = addon.Utility.GetZoneIdsAndIndexes(worldEventObjective.poiZoneIndex)
     if completionZoneId == 0 then
         return
     end
@@ -102,54 +98,42 @@ function ZoneGuideTracker:DeactivateWorldEventInstance()
     if addon.Data:SetActivityComplete(completionZoneId, ZONE_COMPLETION_TYPE_WORLD_EVENTS, worldEventObjective.activityIndex, true) then
         -- Refresh UI, and announce if not the first time
         if completedBefore then
-            self:UpdateUIAndAnnounce(worldEventObjective, true)
+            self:UpdateUIAndAnnounce(worldEventObjective)
         else
             self:UpdateUI()
         end
     end
 end
 
-function ZoneGuideTracker:FindBestZoneCompletionActivityNameMatch(completionZoneId, name, completionType, completionZoneIndex)
+function ZoneGuideTracker:FindBestZoneCompletionActivityNameMatch(completionZoneId, name, ...)
   
+    local completionTypes = {...}
     local halfSearchStringLength = math.ceil(ZoUTF8StringLength(name)/2)
     local maxEditDistance = math.min(ZONE_ACTIVITY_NAME_MAX_EDIT_DISTANCE, halfSearchStringLength)
     local lowestEditDistance = maxEditDistance + 1
-    if not completionZoneIndex then
-        completionZoneIndex = GetZoneIndex(completionZoneId)
-    end
-    local match
-    for activityIndex = 1, GetNumZoneActivitiesForZoneCompletionType(completionZoneId, completionType) do
-        local objective = self.objectives[completionZoneIndex][completionType][activityIndex]
-        if objective then
-            local editDistance = addon.Utility.EditDistance(objective.name, name, lowestEditDistance)
-            if editDistance < lowestEditDistance then
-                match = objective
-                lowestEditDistance = editDistance
+    local completionZoneIndex = GetZoneIndex(completionZoneId)
+    local match, matchCompletionType
+    for _, completionType in ipairs(completionTypes) do
+        for activityIndex = 1, GetNumZoneActivitiesForZoneCompletionType(completionZoneId, completionType) do
+            local objective = self.objectives[completionZoneIndex][completionType][activityIndex]
+            if objective then
+                local editDistance = addon.Utility.EditDistance(objective.name, name, lowestEditDistance)
+                if editDistance < lowestEditDistance then
+                    match = objective
+                    matchCompletionType = completionType
+                    lowestEditDistance = editDistance
+                end
             end
         end
     end
-    return match, lowestEditDistance
+    return match, lowestEditDistance, matchCompletionType
 end
 
 function ZoneGuideTracker:FindAllObjectives(matchFunction, completionType, ...)
   
     local matches = {}
-    local zoneIndex = GetCurrentMapZoneIndex()
-    if not zoneIndex then
-        return matches
-    end
-    
-    local zoneId = GetZoneId(zoneIndex)
-    if zoneId == 0 then
-        return matches
-    end
-    
-    local completionZoneId = GetZoneStoryZoneIdForZoneId(zoneId)
-    if completionZoneId == 0 then
-        return matches
-    end
-    
-    local completionZoneIndex = GetZoneIndex(completionZoneId)
+  
+    local zoneId, completionZoneId, zoneIndex, completionZoneIndex = addon.Utility.GetZoneIdsAndIndexes(GetCurrentMapZoneIndex())
     if completionZoneIndex == 0 then
         return matches
     end
@@ -174,6 +158,7 @@ function ZoneGuideTracker:FindAllObjectives(matchFunction, completionType, ...)
 end
 
 function ZoneGuideTracker:FindObjective(matchFunction, completionZoneIndex, completionType, ...)
+    self:InitializeZone(completionZoneIndex)
     if not self.objectives[completionZoneIndex] then
         return
     end
@@ -192,6 +177,10 @@ function ZoneGuideTracker:FindObjective(matchFunction, completionZoneIndex, comp
     end
 end
 
+function ZoneGuideTracker:GetMaxEditDistance()
+    return ZONE_ACTIVITY_NAME_MAX_EDIT_DISTANCE
+end
+
 function ZoneGuideTracker:GetObjectivePlayerIsNearest(completionType)
     local matches = self:FindAllObjectives(isPlayerNearObjective, completionType)
     local normalizedX, normalizedZ = GetMapPlayerPosition("player")
@@ -201,7 +190,7 @@ function ZoneGuideTracker:GetObjectivePlayerIsNearest(completionType)
     for _, match in ipairs(matches) do
         local objective = match[1]
         local objectiveCompletionType = match[2]
-        local objectiveX, objectiveZ = addon.Data:GetPOIMapInfoOnAccount(objective.zoneIndex, objective.poiIndex)
+        local objectiveX, objectiveZ = addon.Data:GetPOIMapInfoOnAccount(objective.poiZoneIndex, objective.poiIndex)
         local distance = addon.Utility.CartesianDistance2D(normalizedX, normalizedZ, objectiveX, objectiveZ)
         if not nearestDistance or distance < nearestDistance then
             nearestDistance = distance
@@ -216,14 +205,22 @@ function ZoneGuideTracker:GetPOIObjective(completionZoneIndex, completionType, p
     return self:FindObjective(matchPoiIndex, completionZoneIndex, completionType, poiZoneIndex, poiIndex)
 end
 
+function ZoneGuideTracker:GetObjective(completionZoneIndex, completionType, activityIndex)
+    if not self.objectives[completionZoneIndex] then
+        return
+    end
+    if not self.objectives[completionZoneIndex][completionType] then
+        return
+    end
+    return self.objectives[completionZoneIndex][completionType][activityIndex]
+end
+
 function ZoneGuideTracker:GetObjectiveByName(completionZoneIndex, completionType, objectiveName)
     return self:FindObjective(matchObjectiveName, completionZoneIndex, completionType, objectiveName)
 end
 
 --[[  ]]--
 function ZoneGuideTracker:InitializeZone(zoneIndex)
-    
-    addon.Utility.Debug("InitializeZone(zoneIndex: " .. tostring(zoneIndex) .. ")", debug)
   
     if zoneIndex == 0 then
         return
@@ -234,21 +231,16 @@ function ZoneGuideTracker:InitializeZone(zoneIndex)
         return true
     end
     
+    addon.Utility.Debug("InitializeZone(zoneIndex: " .. tostring(zoneIndex) .. ")", debug)
+    
     self.initializedZoneIndexes[zoneIndex] = true
     
-    local zoneId = GetZoneId(zoneIndex)
-    if zoneId == 0 then
+    local zoneId, completionZoneId, _, completionZoneIndex = addon.Utility.GetZoneIdsAndIndexes(zoneIndex)
+    if completionZoneIndex == 0 then
         return
     end
     
     local totalActivityCount = 0
-    
-    local completionZoneId = GetZoneStoryZoneIdForZoneId(zoneId)
-    if completionZoneId == 0 then
-        return true
-    end
-    
-    local completionZoneIndex = GetZoneIndex(completionZoneId)
     
     if not self.objectives[completionZoneIndex] then
         self.objectives[completionZoneIndex] = {}
@@ -268,9 +260,8 @@ function ZoneGuideTracker:InitializeZone(zoneIndex)
                 
                 local objective = {
                     name          = activityName,
-                    zoneIndex     = poiZoneIndex,
                     activityIndex = activityIndex,
-                    poiId         = poiId,
+                    poiZoneIndex  = poiZoneIndex,
                     poiIndex      = poiIndex,
                 }
                 if completionType == ZONE_COMPLETION_TYPE_WORLD_EVENTS then
@@ -299,28 +290,13 @@ function ZoneGuideTracker:GetObjectives(zoneIndex, completionType)
 end
 
 function ZoneGuideTracker:LoadBaseGameCompletionForCurrentZone()
-    local zoneIndex = GetCurrentMapZoneIndex()
-    if zoneIndex == 0 then
-        return
-    end
-    
-    local zoneId = GetZoneId(zoneIndex)
-    if zoneId == 0 then
-        return
-    end
-    
-    local completionZoneId = GetZoneStoryZoneIdForZoneId(zoneId)
+  
+    local zoneId, completionZoneId = addon.Utility.GetZoneIdsAndIndexes(GetCurrentMapZoneIndex())
     if completionZoneId == 0 then
         return
     end
     
-    local completionZoneIndex = GetZoneIndex(completionZoneId)
-    if completionZoneIndex == 0 then
-        return
-    end
-
-    
-    addon.Data:LoadBaseGameCompletionForZone(completionZoneIndex)
+    addon.Data:LoadBaseGameCompletionForZone(completionZoneId)
     self:UpdateUI()
 end
 
@@ -333,27 +309,14 @@ function ZoneGuideTracker:ResetDangerousMonsterNames()
 end
 
 function ZoneGuideTracker:ResetCurrentZone()
-    local zoneIndex = GetCurrentMapZoneIndex()
-    if zoneIndex == 0 then
-        return
-    end
-    local zoneId = GetZoneId(zoneIndex)
-    if zoneId == 0 then
-        return
-    end
-    
-    local completionZoneId = GetZoneStoryZoneIdForZoneId(zoneId)
+  
+    local zoneId, completionZoneId = addon.Utility.GetZoneIdsAndIndexes(GetCurrentMapZoneIndex())
     if completionZoneId == 0 then
         return
     end
     
-    local completionZoneIndex = GetZoneIndex(completionZoneId)
-    if completionZoneIndex == 0 then
-        return
-    end
-    
-    for completionType, _ in pairs(COMPLETION_TYPES) do
-        for activityIndex = 1, GetNumZoneActivitiesForZoneCompletionType(completionZoneIndex, completionType) do
+    for completionType in pairs(COMPLETION_TYPES) do
+        for activityIndex = 1, GetNumZoneActivitiesForZoneCompletionType(completionZoneId, completionType) do
             addon.Data:SetActivityComplete(completionZoneId, completionType, activityIndex, nil)
         end
     end
@@ -377,8 +340,13 @@ function ZoneGuideTracker:SetActiveWorldEventInstanceId(worldEventInstanceId)
     }
 end
 
-function ZoneGuideTracker:TryRegisterDelveBossKill(unitTag, targetName)
-  
+function ZoneGuideTracker:TryRegisterDelveBossKill(unitTag, targetName, targetUnitId)
+    
+    local zoneId, completionZoneId = addon.Utility.GetZoneIdsAndIndexes(GetUnitZoneIndex("player"))
+    if zoneId == 0 or completionZoneId == 0 then
+        return
+    end
+    
     local difficulty
     local unitReaction
     if unitTag and unitTag ~= "" then
@@ -386,13 +354,27 @@ function ZoneGuideTracker:TryRegisterDelveBossKill(unitTag, targetName)
         unitReaction = GetUnitReaction(unitTag)
     else
         if not targetName or targetName == "" then
-            return
+            targetName = addon.TargetTracker:GetTargetName(targetUnitId)
+            if targetName then
+                addon.Utility.Debug("Empty target name passed, but recovered using target unit id " .. tostring(targetUnitId) 
+                    .. ". New target name is " .. tostring(targetName) .. ".", debug)
+            else
+                addon.Utility.Debug("Target has no name or unit tag. Ignoring kill.", debug)
+                return
+            end
+        else
+            targetName = zo_strformat("<<1>>", targetName)
         end
-        targetName = zo_strformat("<<1>>", targetName)
+        
         difficulty = self.dangerousMonsterNames[targetName]
         if not difficulty then
-            addon.Utility.Debug("Target " .. tostring(targetName) .. " is not a known dangerous monster.", debug)
-            return
+            if addon.MultiBossDelves:IsZoneMultiBoss(zoneId, targetName) then
+                addon.Utility.Debug("Target " .. tostring(targetName) .. " isn't a dangerous monster, but is still required for delve clear. Pretend that it's dangerous.", debug)
+                difficulty = MONSTER_DIFFICULTY_NORMAL
+            else
+                addon.Utility.Debug("Target " .. tostring(targetName) .. " is not a known dangerous monster.", debug)
+                return
+            end
         end
         addon.Utility.Debug("Target " .. tostring(targetName) .. " is a known dangerous monster of difficulty " .. tostring(difficulty) .. ".", debug)
         unitReaction = UNIT_REACTION_HOSTILE
@@ -407,34 +389,25 @@ function ZoneGuideTracker:TryRegisterDelveBossKill(unitTag, targetName)
     
     -- Non-hostile units are not delve bosses
     if unitReaction ~= UNIT_REACTION_HOSTILE then
+        addon.Utility.Debug("Target is not hostile. Ignoring kill.", debug)
         return
     end
     
-    -- Get current zone and confirm that it is valid
-    local zoneIndex = GetUnitZoneIndex("player")
-    if not zoneIndex or zoneIndex == 0 then
-        addon.Utility.Debug("Zone index " .. tostring(zoneIndex) .. " is not valid", debug)
-        return
-    end
-    local zoneId = GetZoneId(zoneIndex)
-    if zoneId == 0 then
-        addon.Utility.Debug("Zone id " .. tostring(zoneId) .. " is not valid", debug)
-        return
-    end
-    
-    local completionZoneId = GetZoneStoryZoneIdForZoneId(zoneId)
-    if completionZoneId == 0 then
-        addon.Utility.Debug("Zone id " .. tostring(zoneId) .. " has no zone tracker.", debug)
+    -- If there's an active boss fight tracked with unit tags, 
+    -- then don't do anything if there isn't a boss unit tag on the target.
+    if addon.BossFight:IsActive()
+       and not addon.Utility.StartsWith(unitTag, "boss")
+    then
+        addon.Utility.Debug("There's an active boss fight, but no boss unit tag was passed.", debug)
         return
     end
     
     local zoneName = GetZoneNameById(zoneId)
     
     -- Try to find a map completion / zone guide activity that matches the current zone name
-    local completionType = ZONE_COMPLETION_TYPE_DELVES
-    local objective, editDistance = self:FindBestZoneCompletionActivityNameMatch(completionZoneId, zoneName, completionType)
+    local objective, editDistance, completionType = self:FindBestZoneCompletionActivityNameMatch(completionZoneId, zoneName, ZONE_COMPLETION_TYPE_DELVES, ZONE_COMPLETION_TYPE_GROUP_DELVES)
     
-    -- No matches found. Probably not a delve.
+    -- No matches found. Probably not a delve or group delve.
     if not objective then
         
         -- For the hardest monster kills that have no "boss" unit tag,
@@ -447,12 +420,12 @@ function ZoneGuideTracker:TryRegisterDelveBossKill(unitTag, targetName)
            and not IsUnitInDungeon("player")
         then
             
-            completionType = ZONE_COMPLETION_TYPE_GROUP_BOSSES
-            objective = self:GetObjectivePlayerIsNearest(completionType)
+            objective = self:GetObjectivePlayerIsNearest(ZONE_COMPLETION_TYPE_GROUP_BOSSES)
             if not objective then
                 addon.Utility.Debug("Not registering a world boss kill because none could be found near the player.", debug)
                 return
             else
+                completionType = ZONE_COMPLETION_TYPE_GROUP_BOSSES
                 addon.Utility.Debug("World boss kill detected for target " .. tostring(targetName) .. ".", debug)
             end
         else
@@ -461,14 +434,46 @@ function ZoneGuideTracker:TryRegisterDelveBossKill(unitTag, targetName)
         end
     end
     
-    if completionType == ZONE_COMPLETION_TYPE_DELVES and not IsUnitInDungeon("player") then
-        addon.Utility.Debug("Player is not in dungeon. Not registering delve kill.", debug)
+    -- Check to see if the character already completed this delve
+    if addon.Data:IsActivityComplete(completionZoneId, completionType, objective.activityIndex) then
+        addon.Utility.Debug(tostring(zoneName) .. ", zone id: " .. tostring(zoneId) .. " is already complete. Not registering boss kill.", debug)
         return
     end
     
-     -- Delves in zones newer than Clockwork City use BossFight to detect boss kills.
-    if addon.BossFight:IsActive() and completionType == ZONE_COMPLETION_TYPE_DELVES then
+    -- Additional check to make sure the player location matches the zone completion type
+    if IsUnitInDungeon("player") then
+        if completionType == ZONE_COMPLETION_TYPE_GROUP_BOSSES then
+            addon.Utility.Debug("Player is not in the overworld. Not registering world boss kill.", debug)
+            return
+        end
+    else
+        if completionType == ZONE_COMPLETION_TYPE_DELVES 
+           or completionType == ZONE_COMPLETION_TYPE_GROUP_DELVES
+        then
+            addon.Utility.Debug("Player is in the overworld. Not registering delve kill.", debug)
+            return
+        end
+    end
     
+    if not targetName or targetName == "" then
+        targetName = zo_strformat("<<1>>", GetUnitName(unitTag))
+    end
+    
+    -- Exclude certain difficult monsters by name that are known to not be bosses.
+    if addon.ExcludedMonsters:IsExcludedMonster(targetName) then
+        addon.Utility.Debug(targetName .. " is specifically excluded. Not registering boss kill.", debug)
+        return
+    end
+    
+    -- Delves in zones newer than Clockwork City use BossFight to detect boss kills.
+    if completionZoneId >= FIRST_ZONE_ID_WITH_DELVE_BOSS_UNIT_TAGS and completionType ~= ZONE_COMPLETION_TYPE_GROUP_BOSSES then
+      
+        -- Check to see if a boss fight is active.
+        if not addon.BossFight:IsActive() then
+            addon.Utility.Debug("Zone guide is for newer content (zone id " .. tostring(completionZoneId) .. "), and there is no boss fight active. Exiting.", debug)
+            return
+        end
+      
         if not addon.BossFight:RegisterKill(unitTag) then
             addon.Utility.Debug("Boss " .. tostring(unitTag) .. " is not a known boss.", debug)
             return
@@ -478,24 +483,14 @@ function ZoneGuideTracker:TryRegisterDelveBossKill(unitTag, targetName)
             addon.Utility.Debug("Kill for boss " .. tostring(unitTag) .. " registered, but there are more bosses waiting to be killed for this world boss fight.", debug)
             return
         end
-    else
-        if not targetName or targetName == "" then
-            targetName = zo_strformat("<<1>>", GetUnitName(unitTag))
-        end
         
-        -- Exclude certain difficult monsters by name that are known to not be bosses.
-        if addon.ExcludedMonsters:IsExcludedMonster(targetName) then
-            addon.Utility.Debug(targetName .. " is specifically excluded. Not registering boss kill.", debug)
+    -- Certain delves, mostly in Craglorn and Cyrodiil, require killing several bosses to get credit.
+    elseif addon.MultiBossDelves:IsZoneMultiBossDelve(zoneId) then
+    
+        addon.MultiBossDelves:RegisterBossKill(zoneId, targetName)
+        if not addon.MultiBossDelves:AreAllBossesKilled(zoneId) then
+            addon.Utility.Debug("Not all bosses in "..tostring(zoneName) .. ", zone id: " .. tostring(zoneId) .. " are killed yet.", debug)
             return
-        end
-        
-        -- Certain delves in Craglorn and Cyrodiil require killing several bosses to get credit.
-        if addon.MultiBossDelves:IsZoneMultiBossDelve(zoneId) then
-            addon.MultiBossDelves:RegisterBossKill(zoneId, targetName)
-            if not addon.MultiBossDelves:AreAllBossesKilled(zoneId) then
-                addon.Utility.Debug("Not all bosses in "..tostring(zoneName) .. ", zone id: " .. tostring(zoneId) .. " are killed yet.", debug)
-                return
-            end
         end
     end
     
@@ -504,7 +499,7 @@ function ZoneGuideTracker:TryRegisterDelveBossKill(unitTag, targetName)
     if addon.Data:SetActivityComplete(completionZoneId, completionType, objective.activityIndex, true) then
         -- Refresh UI, and announce if not first time
         if completedBefore then
-            self:UpdateUIAndAnnounce(objective, true)
+            self:UpdateUIAndAnnounce(objective)
         else
             self:UpdateUI()
         end
@@ -555,7 +550,7 @@ function ZoneGuideTracker:TryRegisterWorldBossKill(unitTag)
     if addon.Data:SetActivityComplete(completionZoneId, ZONE_COMPLETION_TYPE_GROUP_BOSSES, worldBossObjective.activityIndex, true) then
         -- Refresh UI, and announce if not the first time
         if completedBefore then
-            self:UpdateUIAndAnnounce(worldBossObjective, true)
+            self:UpdateUIAndAnnounce(worldBossObjective)
         else
             self:UpdateUI()
         end
@@ -584,11 +579,9 @@ function ZoneGuideTracker:UpdateUI()
     end
 end
 
-function ZoneGuideTracker:UpdateUIAndAnnounce(objective, complete)
+function ZoneGuideTracker:UpdateUIAndAnnounce(objective)
     self:UpdateUI()
-    if complete then
-        addon.ZoneGuideTracker:AnnounceCompletion(objective)
-    end
+    addon.ZoneGuideTracker:AnnounceCompletion(objective)
 end
 
 
@@ -600,7 +593,7 @@ end
 ---------------------------------------
 
 function isPlayerNearObjective(objective)
-    local isNearby = select(8, GetPOIMapInfo(objective.zoneIndex, objective.poiIndex))
+    local isNearby = select(8, GetPOIMapInfo(objective.poiZoneIndex, objective.poiIndex))
     if isNearby then
         return true
     end
@@ -611,7 +604,7 @@ function matchObjectiveName(objective, objectiveName)
 end
 
 function matchPoiIndex(objective, zoneIndex, poiIndex)
-    return objective.zoneIndex == zoneIndex and objective.poiIndex == poiIndex
+    return objective.poiZoneIndex == zoneIndex and objective.poiIndex == poiIndex
 end
 
 

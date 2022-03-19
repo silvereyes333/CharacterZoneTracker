@@ -24,6 +24,32 @@ function addon.Utility.CartesianDistance2D(x1, y1, x2, y2)
     return math.sqrt(dx * dx + dy * dy)
 end
 
+function addon.Utility.GetZoneIdsAndIndexes(zoneIndex)
+    if not zoneIndex or zoneIndex == 0 then
+        addon.Utility.Debug("Zone index " .. tostring(zoneIndex) .. " is not valid", debug)
+        return 0, 0, 0, 0
+    end
+    
+    local zoneId = GetZoneId(zoneIndex)
+    if zoneId == 0 then
+        addon.Utility.Debug("Zone id " .. tostring(zoneId) .. " is not valid", debug)
+        return 0, 0, zoneIndex, 0
+    end
+    
+    local completionZoneId = GetZoneStoryZoneIdForZoneId(zoneId)
+    if completionZoneId == 0 then
+        addon.Utility.Debug("Zone id " .. tostring(zoneId) .. " has no zone tracker.", debug)
+        return zoneId, 0, zoneIndex, 0
+    end
+    
+    local completionZoneIndex = GetZoneIndex(completionZoneId)
+    if completionZoneIndex == 0 then
+        addon.Utility.Debug("Completion zone id " .. tostring(zoneId) .. " is not valid.", debug)
+    end
+    
+    return zoneId, completionZoneId, zoneIndex, completionZoneIndex
+end
+
 --[[
     Function: EditDistance
     Finds the edit distance between two strings or tables. Edit distance is the minimum number of
@@ -71,7 +97,6 @@ function addon.Utility.EditDistance( s, t, lim )
     local start = os.rawclock()
     local s_len, t_len = #s, #t -- Calculate the sizes of the strings or arrays
     if lim and math.abs( s_len - t_len ) >= lim then -- If sizes differ by lim, we can stop here
-        addon.timeCalculatingLevenshtein = addon.timeCalculatingLevenshtein + os.rawclock() - start
         return lim
     end
     
@@ -126,12 +151,10 @@ function addon.Utility.EditDistance( s, t, lim )
         end
         
         if lim and best >= lim then
-            addon.timeCalculatingLevenshtein = addon.timeCalculatingLevenshtein + os.rawclock() - start
             return lim
         end
     end
     
-    addon.timeCalculatingLevenshtein = addon.timeCalculatingLevenshtein + os.rawclock() - start
     return d[ #d ]
 end
 

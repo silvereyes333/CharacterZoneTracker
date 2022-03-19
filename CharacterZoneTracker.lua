@@ -4,7 +4,7 @@
 CharacterZoneTracker = {
     name = "CharacterZoneTracker",
     title = "Character Zone Tracker",
-    version = "1.2.2",
+    version = "1.3.0",
     author = "silvereyes",
     debugMode = false,
 }
@@ -55,11 +55,11 @@ function onAddonLoaded(event, name)
     if name ~= addon.name then return end
     EVENT_MANAGER:UnregisterForEvent(addon.name, EVENT_ADD_ON_LOADED)
     
-    addon.timeCalculatingLevenshtein = 0
     addon.SubzoneMap:Initialize()
     addon.Data:Initialize()
     addon.Compass:Initialize()
     addon.WorldMap:Initialize()
+    addon.TargetTracker:Initialize()
     addon.Events:Initialize()
 end
 

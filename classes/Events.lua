@@ -18,12 +18,13 @@ end
 function Events:Initialize()    
     for handlerIndex = 1, #HANDLER_CONFIG do
         local handler = HANDLER_CONFIG[handlerIndex]
-        EVENT_MANAGER:RegisterForEvent(addon.name .. handler.name, handler.event, self:Closure(handler.name))
+        local key = addon.name.. tostring(handlerIndex) .. handler.name
+        EVENT_MANAGER:RegisterForEvent(key , handler.event, self:Closure(handler.name))
         if handler.filters then
             for filterIndex = 1, #handler.filters do
                 local filterType = handler.filters[filterIndex][1]
                 local filterValue = handler.filters[filterIndex][2]
-                EVENT_MANAGER:AddFilterForEvent(addon.name .. handler.name, handler.event, filterType, filterValue)
+                EVENT_MANAGER:AddFilterForEvent(key, handler.event, filterType, filterValue)
             end
         end
     end
@@ -64,11 +65,18 @@ function Events:Closure(functionName)
     end
 end
 
+function Events:CombatEventDamaged(eventCode, result, isError, abilityName, abilityGraphic, abilityActionSlotType, sourceName, sourceType, targetName, targetType, hitValue, powerType, damageType, log, sourceUnitId, targetUnitId, abilityId, overflow)
+      addon.Utility.Debug("EVENT_COMBAT_EVENT(" .. tostring(eventCode) .. ", result: "..tostring(result) .. ", isError: "..tostring(isError) 
+        .. ", sourceName: "..tostring(sourceName) .. ", sourceType: " .. tostring(sourceType) .. ", targetName: "..tostring(targetName) .. ", targetType: "..tostring(targetType) 
+        .. ", source: "..tostring(sourceUnitId) .. ", target: "..tostring(targetUnitId) .. ")", debug)
+      addon.TargetTracker:RegisterTarget(targetUnitId, targetName)
+end
+
 function Events:CombatEventDiedXP(eventCode, result, isError, abilityName, abilityGraphic, abilityActionSlotType, sourceName, sourceType, targetName, targetType, hitValue, powerType, damageType, log, sourceUnitId, targetUnitId, abilityId, overflow)
       addon.Utility.Debug("EVENT_COMBAT_EVENT(" .. tostring(eventCode) .. ", result: "..tostring(result) .. ", isError: "..tostring(isError) 
         .. ", sourceName: "..tostring(sourceName) .. ", sourceType: " .. tostring(sourceType) .. ", targetName: "..tostring(targetName) .. ", targetType: "..tostring(targetType) 
         .. ", source: "..tostring(sourceUnitId) .. ", target: "..tostring(targetUnitId) .. ")", debug)
-      addon.ZoneGuideTracker:TryRegisterDelveBossKill(nil, targetName)
+      addon.ZoneGuideTracker:TryRegisterDelveBossKill(nil, targetName, targetUnitId)
 end
 
 --[[  ]]
@@ -80,16 +88,7 @@ function Events:PlayerActivated(eventCode, initial)
     addon.ZoneGuideTracker:ResetDangerousMonsterNames()
     addon.BossFight:UpdateBossList()
     addon.ZoneGuideTracker:InitializeZone(zoneIndex)
-end
-
---[[  ]]
-function Events:ReticleoverUnitDeathStateChanged(eventCode, unitTag, isDead)
-    if not isDead then
-        return
-    end
-    
-    addon.Utility.Debug("EVENT_UNIT_DEATH_STATE_CHANGED(" .. tostring(eventCode) .. ", unitTag: "..tostring(unitTag) .. ", unitName: "..tostring(GetUnitName(unitTag)) .. ", isDead: "..tostring(isDead) .. ")", debug)
-    addon.ZoneGuideTracker:TryRegisterDelveBossKill(unitTag)
+    addon.ZoneGuideTracker:UpdateUI()
 end
 
 function Events:ReticleTargetChanged(eventCode)
@@ -143,14 +142,7 @@ function Events:ZoneChanged(eventCode, zoneName, subZoneName, newSubzone, zoneId
     local zoneIndex = GetZoneIndex(zoneId)
     addon.Utility.Debug("EVENT_ZONE_CHANGED(" .. tostring(zoneName) .. ", "..tostring(subZoneName) .. ", "..tostring(newSubzone) .. ", zoneId: "..tostring(zoneId) .. ", subZoneId: "..tostring(subZoneId) .. ")", debug)
     addon.ZoneGuideTracker:ClearActiveWorldEventInstance()
-    addon.ZoneGuideTracker:InitializeZone(zoneIndex)
-end
-
---[[  ]]
-function Events:ZoneUpdate(eventCode, unitTag, newZoneName)
-    local zoneIndex = GetUnitZoneIndex(unitTag)
-    local zoneId = GetZoneId(zoneIndex)
-    addon.Utility.Debug("EVENT_ZONE_UPDATE(" .. tostring(newZoneName) .. ", zoneId: "..tostring(zoneId) .. ", zoneIndex: "..tostring(zoneIndex) .. ")", debug)
+    addon.TargetTracker:Reset()
     addon.ZoneGuideTracker:InitializeZone(zoneIndex)
 end
 
@@ -174,6 +166,13 @@ HANDLER_CONFIG = {
         },
     },
     {
+        name = "CombatEventDamaged",
+        event = EVENT_COMBAT_EVENT,
+        filters = {
+            { REGISTER_FILTER_COMBAT_RESULT, ACTION_RESULT_DAMAGE }
+        },
+    },
+    {
         name = "CombatEventDiedXP",
         event = EVENT_COMBAT_EVENT,
         filters = {
@@ -181,15 +180,15 @@ HANDLER_CONFIG = {
         },
     },
     {
-        name = "PlayerActivated",
-        event = EVENT_PLAYER_ACTIVATED,
+        name = "CombatEventDiedXP",
+        event = EVENT_COMBAT_EVENT,
+        filters = {
+            { REGISTER_FILTER_COMBAT_RESULT, ACTION_RESULT_DIED }
+        },
     },
     {
-        name = "ReticleoverUnitDeathStateChanged",
-        event = EVENT_UNIT_DEATH_STATE_CHANGED,
-        filters = {
-            { REGISTER_FILTER_UNIT_TAG, "reticleover" }
-        },
+        name = "PlayerActivated",
+        event = EVENT_PLAYER_ACTIVATED,
     },
     {
         name = "ReticleTargetChanged",
@@ -210,13 +209,6 @@ HANDLER_CONFIG = {
     {
         name = "ZoneChanged",
         event = EVENT_ZONE_CHANGED,
-    },
-    {
-        name = "ZoneUpdate",
-        event = EVENT_ZONE_UPDATE,
-        filters = {
-            { REGISTER_FILTER_UNIT_TAG, "player" }
-        },
     },
 }
 

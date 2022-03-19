@@ -36,6 +36,28 @@ end
 ---------------------------------------
 
 --[[  ]]--
+function SubzoneMap:FindBestSubzoneNameMatch(zoneId, name)
+    local subzoneIds = self.subzoneIdsByMapCompletionZoneId[zoneId]
+    if not subzoneIds or not name or name == "" then
+        return
+    end
+    local nameLower = zo_strlower(name)
+    local halfSearchStringLength = math.ceil(ZoUTF8StringLength(nameLower)/2)
+    local maxEditDistance = math.min(addon.ZoneGuideTracker:GetMaxEditDistance(), halfSearchStringLength)
+    local lowestEditDistance = maxEditDistance + 1
+    local match
+    for _, subzoneId in ipairs(subzoneIds) do
+        local subzoneNameLower = zo_strlower(zo_strformat("<<1>>", GetZoneNameById(subzoneId)))
+        local editDistance = addon.Utility.EditDistance(subzoneNameLower, nameLower, lowestEditDistance)
+        if editDistance < lowestEditDistance then
+            match = subzoneId
+            lowestEditDistance = editDistance
+        end
+    end
+    return match, lowestEditDistance
+end
+
+--[[  ]]--
 function SubzoneMap:GetSubzoneIds(zoneId)
     return self.subzoneIdsByMapCompletionZoneId[zoneId]
 end
