@@ -217,6 +217,9 @@ end
 ---------------------------------------
 
 function getPinDetails(pin)
+    if not pin or not pin.GetPOIZoneIndex then
+        return
+    end
     local poiZoneIndex = pin:GetPOIZoneIndex()
     if poiZoneIndex == -1 then
         return

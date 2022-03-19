@@ -129,27 +129,28 @@ function ZoneGuideTracker:FindBestZoneCompletionActivityNameMatch(completionZone
 end
 
 function ZoneGuideTracker:FindAllObjectives(matchFunction, completionType, ...)
+  
+    local matches = {}
     local zoneIndex = GetCurrentMapZoneIndex()
     if not zoneIndex then
-        return
+        return matches
     end
     
     local zoneId = GetZoneId(zoneIndex)
     if zoneId == 0 then
-        return
+        return matches
     end
     
     local completionZoneId = GetZoneStoryZoneIdForZoneId(zoneId)
     if completionZoneId == 0 then
-        return
+        return matches
     end
     
     local completionZoneIndex = GetZoneIndex(completionZoneId)
     if completionZoneIndex == 0 then
-        return
+        return matches
     end
     
-    local matches = {}
     if not self.objectives[completionZoneIndex] then
         return matches
     end
