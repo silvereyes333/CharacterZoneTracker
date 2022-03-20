@@ -73,8 +73,11 @@ function ZoneGuideTracker:DeactivateWorldEventInstance()
     addon.Utility.Debug("Deactivating active world event poiIndex " .. tostring(self.activeWorldEvent.poiIndex), debug)
     local activePoiIndex = self.activeWorldEvent.poiIndex
     local worldEventObjective, _, objectiveDistance = self:GetObjectivePlayerIsNearest(ZONE_COMPLETION_TYPE_WORLD_EVENTS)
-    if not worldEventObjective or objectiveDistance > WORLD_EVENT_MAX_DISTANCE then
+    if not worldEventObjective then
         addon.Utility.Debug("Not completing world event, because none are nearby.", debug)
+        return
+    elseif objectiveDistance > WORLD_EVENT_MAX_DISTANCE then
+        addon.Utility.Debug("Not completing world event, the nearest, " .. tostring(worldEventObjective.name) .. ", is " .. tostring(objectiveDistance) .. " units away.", debug)
         return
     elseif worldEventObjective.poiIndex ~= activePoiIndex then
         addon.Utility.Debug("The nearest world event objective, " .. tostring(worldEventObjective.name) .. " has a poiIndex of " .. tostring(worldEventObjective.poiIndex) .. ". Exiting.", debug)
@@ -198,7 +201,8 @@ function ZoneGuideTracker:GetObjectivePlayerIsNearest(completionType)
     for _, match in ipairs(matches) do
         local objective = match[1]
         local objectiveCompletionType = match[2]
-        local distance = addon.Utility.CartesianDistance2D(normalizedX, normalizedZ, objective.normalizedX, objective.normalizedZ)
+        local objectiveX, objectiveZ = addon.Data:GetPOIMapInfoOnAccount(objective.zoneIndex, objective.poiIndex)
+        local distance = addon.Utility.CartesianDistance2D(normalizedX, normalizedZ, objectiveX, objectiveZ)
         if not nearestDistance or distance < nearestDistance then
             nearestDistance = distance
             nearestObjective = objective
@@ -261,7 +265,6 @@ function ZoneGuideTracker:InitializeZone(zoneIndex)
                 local activityName = GetZoneStoryActivityNameByActivityIndex(completionZoneId, completionType, activityIndex)
                 local poiId = GetZoneActivityIdForZoneCompletionType(completionZoneId, completionType, activityIndex)
                 local poiZoneIndex, poiIndex = GetPOIIndices(poiId)
-                local normalizedX, normalizedZ = addon.Data:GetPOIMapInfoOnAccount(poiZoneIndex, poiIndex)
                 
                 local objective = {
                     name          = activityName,
@@ -269,8 +272,6 @@ function ZoneGuideTracker:InitializeZone(zoneIndex)
                     activityIndex = activityIndex,
                     poiId         = poiId,
                     poiIndex      = poiIndex,
-                    normalizedX   = normalizedX,
-                    normalizedZ   = normalizedZ,
                 }
                 if completionType == ZONE_COMPLETION_TYPE_WORLD_EVENTS then
                     if objective.poiIndex then

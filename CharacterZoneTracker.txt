@@ -1,7 +1,7 @@
 ## Title: Character Zone Tracker
 ## Author: silvereyes
 ## Description: Tracks zone completion for delves, world bosses and world events per-character.
-## Version: 1.2.1
+## Version: 1.2.2
 ## APIVersion: 101033
 ## DependsOn: LibSavedVars>=50000
 ## OptionalDependsOn: LibChatMessage
